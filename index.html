@@ -191,6 +191,37 @@
     background:var(--gold-soft); border:1px solid #E3D5A8; border-radius:10px;
     padding:11px 13px; font-size:13px; color:#6E5514; margin-bottom:12px; line-height:1.45;
   }
+  .alert-red{
+    background:var(--red-soft); border:1px solid #EFC4C5; border-radius:10px;
+    padding:11px 13px; font-size:13px; color:#7C1D22; margin-bottom:12px; line-height:1.45;
+  }
+  /* Devam çubuğu */
+  .bar-track{
+    height:7px; background:#E8EFF7; border-radius:4px; overflow:hidden; margin-top:7px;
+  }
+  .bar-fill{height:100%; border-radius:4px; transition:width .3s ease;}
+  .bar-fill.good{background:var(--green);}
+  .bar-fill.mid{background:var(--gold);}
+  .bar-fill.low{background:var(--red);}
+  .rate-num{
+    font-family:var(--font-display); font-size:19px; font-weight:600; line-height:1;
+    flex-shrink:0; min-width:52px; text-align:right;
+  }
+  .rate-num.good{color:var(--green);}
+  .rate-num.mid{color:var(--gold);}
+  .rate-num.low{color:var(--red);}
+  .att-stat-row{padding:12px 4px; border-bottom:1px solid var(--line);}
+  .att-stat-row:last-child{border-bottom:none;}
+  .att-stat-top{display:flex; align-items:center; justify-content:space-between; gap:10px;}
+  /* WhatsApp butonu */
+  .wa-btn{
+    width:34px; height:34px; border-radius:8px; background:#DFF3E4; color:#1F7A45;
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+    border:none; cursor:pointer; padding:0;
+  }
+  .wa-btn:active{background:#C9E9D3;}
+  .wa-btn svg{width:19px; height:19px;}
+  .wa-btn.off{background:#EEF1F5; color:#A9B6C6;}
 
   .empty{
     text-align:center; padding:34px 10px; color:var(--ink-soft); font-size:13.5px;
@@ -261,6 +292,12 @@
       <h2>Yaklaşan Ödeme Tarihleri</h2>
       <p style="font-size:12.5px; color:var(--ink-soft); margin:-6px 0 12px;">Her sporcunun son ödeme tarihinden 1 ay sonrası hesaplanır. 1 gün kala uyarı çıkar.</p>
       <div id="upcomingList"></div>
+    </div>
+
+    <div class="card">
+      <h2>Devam Durumu</h2>
+      <p style="font-size:12.5px; color:var(--ink-soft); margin:-6px 0 12px;">Son 30 gündeki antrenmanlara katılım. Üst üste 3 antrenman gelmeyen sporcu için uyarı çıkar.</p>
+      <div id="attendanceStats"></div>
     </div>
 
     <div class="card">
@@ -568,6 +605,7 @@ function renderAthleteList(){
         <div class="meta">${a.belt} kuşak · ${a.category} · ₺${a.fee}/ay</div>
       </div>
       <div class="actions">
+        ${waButton(a, 'genel')}
         <button class="icon-btn" onclick="editAthlete('${a.id}')" title="Düzenle">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
         </button>
@@ -676,7 +714,10 @@ function renderDuesList(){
         <div class="athlete-info">
           <div class="name">${escapeHtml(a.name)}</div>
         </div>
-        <button class="paid-pill ${d.paid?'yes':'no'}" onclick="toggleDuePaid('${a.id}')">${d.paid?'ÖDENDİ':'ÖDENMEDİ'}</button>
+        <div class="actions">
+          ${d.paid ? '' : waButton(a, 'aidat')}
+          <button class="paid-pill ${d.paid?'yes':'no'}" onclick="toggleDuePaid('${a.id}')">${d.paid?'ÖDENDİ':'ÖDENMEDİ'}</button>
+        </div>
       </div>
       <div class="due-bottom">
         <input type="number" inputmode="numeric" value="${d.amount}" onchange="updateDueAmount('${a.id}', this.value)" placeholder="Tutar">
@@ -727,6 +768,153 @@ async function saveDues(){
 }
 
 /* ---------------- ÖZET ---------------- */
+/* ---------------- DEVAM TAKİBİ ---------------- */
+// Son 30 gündeki yoklamaları okur, sporcu başına katılım oranı ve
+// üst üste kaçırılan antrenman sayısını hesaplar.
+async function computeAttendanceStats(){
+  const keys = await listKeys('attendance:');
+  const bugun = new Date();
+  const sinir = new Date(bugun.getFullYear(), bugun.getMonth(), bugun.getDate()-30);
+
+  const tarihler = keys.map(k=>k.replace('attendance:',''))
+    .filter(d=>{
+      const [y,m,g] = d.split('-').map(Number);
+      return new Date(y, m-1, g) >= sinir;
+    })
+    .sort(); // eskiden yeniye
+
+  const kayitlar = {};
+  for(const d of tarihler) kayitlar[d] = await loadAttendance(d);
+
+  const sonuc = [];
+  for(const a of athletes){
+    let katildi = 0, isaretli = 0;
+    for(const d of tarihler){
+      const v = kayitlar[d][a.id];
+      if(v === true){ katildi++; isaretli++; }
+      else if(v === false){ isaretli++; }
+    }
+    // En son antrenmandan geriye doğru üst üste kaç kez gelmemiş
+    let ustUste = 0;
+    for(let i = tarihler.length-1; i >= 0; i--){
+      const v = kayitlar[tarihler[i]][a.id];
+      if(v === false) ustUste++;
+      else if(v === true) break;
+    }
+    sonuc.push({
+      athlete: a,
+      katildi, isaretli,
+      oran: isaretli ? Math.round(katildi/isaretli*100) : null,
+      ustUste
+    });
+  }
+  // Önce riskliler: üst üste kaçıranlar, sonra düşük oranlılar
+  sonuc.sort((x,y)=>{
+    if(y.ustUste !== x.ustUste) return y.ustUste - x.ustUste;
+    return (x.oran===null?101:x.oran) - (y.oran===null?101:y.oran);
+  });
+  return {list: sonuc, antrenmanSayisi: tarihler.length};
+}
+
+function oranSinifi(oran){
+  if(oran === null) return 'mid';
+  if(oran >= 75) return 'good';
+  if(oran >= 50) return 'mid';
+  return 'low';
+}
+
+async function renderAttendanceStats(){
+  const wrap = document.getElementById('attendanceStats');
+  if(!wrap) return;
+  if(athletes.length === 0){
+    wrap.innerHTML = `<div class="empty">Henüz sporcu yok.</div>`;
+    return;
+  }
+  const {list, antrenmanSayisi} = await computeAttendanceStats();
+  if(antrenmanSayisi === 0){
+    wrap.innerHTML = `<div class="empty">Son 30 günde kayıtlı yoklama yok.<br>Yoklama sekmesinden antrenman kaydet.</div>`;
+    return;
+  }
+
+  const riskli = list.filter(x=>x.ustUste >= 3);
+  let html = '';
+  if(riskli.length){
+    html += `<div class="alert-red"><strong>Uzaklaşıyor:</strong> ${riskli.map(x=>`${escapeHtml(x.athlete.name)} (${x.ustUste} antrenman)`).join(', ')}. Bir arayıp sorman iyi olabilir.</div>`;
+  }
+  html += `<p style="font-family:var(--font-mono); font-size:11.5px; color:var(--ink-soft); margin:0 0 10px;">Son 30 günde ${antrenmanSayisi} antrenman kaydı</p>`;
+
+  html += list.map(x=>{
+    const cls = oranSinifi(x.oran);
+    const oranYazi = x.oran === null ? '—' : x.oran + '%';
+    const alt = x.isaretli === 0
+      ? 'Bu dönem yoklamada işaretlenmemiş'
+      : `${x.katildi} / ${x.isaretli} antrenman` + (x.ustUste >= 2 ? ` · üst üste ${x.ustUste} kez gelmedi` : '');
+    return `
+    <div class="att-stat-row">
+      <div class="att-stat-top">
+        <div class="athlete-info" style="min-width:0; flex:1;">
+          <div class="name">${escapeHtml(x.athlete.name)}</div>
+          <div class="meta">${alt}</div>
+        </div>
+        ${waButton(x.athlete, 'devam')}
+        <div class="rate-num ${cls}">${oranYazi}</div>
+      </div>
+      <div class="bar-track"><div class="bar-fill ${cls}" style="width:${x.oran||0}%"></div></div>
+    </div>`;
+  }).join('');
+
+  wrap.innerHTML = html;
+}
+
+/* ---------------- WHATSAPP ---------------- */
+// 05xx xxx xx xx / +90 5xx / 5xx... hepsini 905xxxxxxxxx biçimine çevirir
+function normalizePhone(ham){
+  if(!ham) return null;
+  let s = String(ham).replace(/\D/g,'');
+  if(s.startsWith('0090')) s = s.slice(4);
+  if(s.startsWith('90') && s.length === 12) return s;
+  if(s.startsWith('0')) s = s.slice(1);
+  if(s.length === 10 && s.startsWith('5')) return '90' + s;
+  if(s.length >= 11 && s.length <= 15) return s; // yurt dışı numarası olabilir
+  return null;
+}
+
+const WA_SVG = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.5 14.4c-.3-.2-1.7-.8-2-.9-.3-.1-.5-.2-.7.1-.2.3-.7.9-.9 1.1-.2.2-.3.2-.6.1-.3-.2-1.2-.5-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6l.5-.5c.1-.2.2-.3.3-.5 0-.2 0-.4-.1-.5l-.9-2.1c-.2-.5-.4-.5-.6-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.4s1 2.8 1.2 3c.2.2 2.1 3.2 5 4.4.7.3 1.2.5 1.7.6.7.2 1.3.2 1.8.1.6-.1 1.7-.7 1.9-1.4.2-.7.2-1.2.2-1.4-.1-.1-.3-.2-.6-.3z"/><path d="M12 2C6.5 2 2 6.5 2 12c0 1.8.5 3.4 1.3 4.9L2 22l5.3-1.3c1.4.8 3 1.2 4.7 1.2 5.5 0 10-4.5 10-10S17.5 2 12 2zm0 18.2c-1.5 0-3-.4-4.2-1.2l-.3-.2-3.1.8.8-3-.2-.3c-.8-1.3-1.3-2.8-1.3-4.4C3.7 7.4 7.4 3.7 12 3.7S20.3 7.4 20.3 12 16.6 20.2 12 20.2z"/></svg>';
+
+function waButton(a, tip){
+  const tel = normalizePhone(a.phone);
+  if(!tel){
+    return `<button class="wa-btn off" onclick="noPhone('${a.id}')" title="Telefon kayıtlı değil">${WA_SVG}</button>`;
+  }
+  return `<button class="wa-btn" onclick="openWhatsApp('${a.id}','${tip}')" title="WhatsApp'tan yaz">${WA_SVG}</button>`;
+}
+
+function noPhone(id){
+  const a = athletes.find(x=>x.id===id);
+  toast(a ? `${a.name} için telefon kayıtlı değil` : 'Telefon kayıtlı değil');
+}
+
+async function openWhatsApp(id, tip){
+  const a = athletes.find(x=>x.id===id);
+  if(!a) return;
+  const tel = normalizePhone(a.phone);
+  if(!tel){ noPhone(id); return; }
+
+  const kulup = 'Ardeşen Karate Spor Kulübü';
+  let mesaj;
+
+  if(tip === 'aidat'){
+    const ay = new Date().toLocaleDateString('tr-TR', {month:'long', year:'numeric'});
+    mesaj = `Merhaba, ${kulup}'nden yazıyorum. ${a.name} için ${ay} aidatı (₺${a.fee}) henüz ödenmemiş görünüyor. Uygun olduğunuzda hatırlatmak istedim. İyi günler.`;
+  }else if(tip === 'devam'){
+    mesaj = `Merhaba, ${kulup}'nden yazıyorum. ${a.name}'ı son antrenmanlarda göremedik, bir aksilik var mı diye sormak istedim. İyi günler.`;
+  }else{
+    mesaj = `Merhaba, ${kulup}'nden yazıyorum. ${a.name} hakkında konuşmak istedim.`;
+  }
+
+  window.open(`https://wa.me/${tel}?text=${encodeURIComponent(mesaj)}`, '_blank');
+}
+
 async function renderOzet(){
   document.getElementById('statAthletes').textContent = athletes.length;
 
@@ -759,11 +947,15 @@ async function renderOzet(){
           <div class="name">${escapeHtml(a.name)}</div>
           <div class="meta">₺${a.fee}/ay bekleniyor</div>
         </div>
-        <span class="paid-pill no">ÖDENMEDİ</span>
+        <div class="actions">
+          ${waButton(a, 'aidat')}
+          <span class="paid-pill no">ÖDENMEDİ</span>
+        </div>
       </div>`).join('');
   }
 
   renderUpcoming();
+  renderAttendanceStats();
 }
 
 /* ---------------- YAKLAŞAN ÖDEMELER ---------------- */
