@@ -127,6 +127,7 @@
   /* ---------- Form elements ---------- */
   label{display:block; font-size:12px; color:var(--ink-soft); margin:10px 0 5px; font-weight:500;}
   label:first-child{margin-top:0;}
+  input[type=search]{-webkit-appearance:none;}
   input, select{
     width:100%; padding:11px 12px; border:1px solid var(--line); border-radius:10px;
     font-family:var(--font-body); font-size:15px; background:#F7FAFD; color:var(--ink);
@@ -340,8 +341,12 @@
     <div class="card">
       <h2>Yedekleme</h2>
       <p id="storageInfo" style="font-family:var(--font-mono); font-size:11.5px; color:var(--ink-soft); margin:-6px 0 10px;"></p>
-      <p style="font-size:13px; color:var(--ink-soft); margin:0 0 10px;">Tüm verileri tek bir dosyaya indir. Kaydettikçe kaybolmasın diye ara sıra al.</p>
-      <button class="btn btn-ghost" style="width:100%;" onclick="exportData()">JSON olarak dışa aktar</button>
+      <div id="backupWarning"></div>
+      <p style="font-size:13px; color:var(--ink-soft); margin:0 0 10px;">Veriler yalnızca bu telefonda duruyor. Telefon değişirse ya da uygulama silinirse yedek olmadan geri gelmez.</p>
+      <button class="btn btn-primary" style="margin-top:0;" onclick="shareBackup()">Yedeği paylaş / gönder</button>
+      <button class="btn btn-ghost" style="width:100%; margin-top:8px;" onclick="exportData()">Dosya olarak indir</button>
+      <button class="btn btn-ghost" style="width:100%; margin-top:8px;" onclick="document.getElementById('restoreFile').click()">Yedekten geri yükle</button>
+      <input type="file" id="restoreFile" accept=".json,application/json" style="display:none" onchange="restoreBackup(this)">
     </div>
   </section>
 
@@ -417,7 +422,14 @@
 
     <div class="card">
       <h2>Sporcu Listesi (<span id="athleteCount">0</span>)</h2>
+      <input type="search" id="athleteSearch" placeholder="İsimle ara..." oninput="renderAthleteList()" style="margin-bottom:12px;">
       <div id="athleteList"></div>
+    </div>
+
+    <div class="card" id="passiveCard" style="display:none;">
+      <h2>Ayrılanlar (<span id="passiveCount">0</span>)</h2>
+      <p style="font-size:12.5px; color:var(--ink-soft); margin:-6px 0 12px;">Kayıtları duruyor ama yoklama, aidat ve istatistiklerde çıkmıyorlar. Geri dönerlerse tek dokunuşla aktifleştir.</p>
+      <div id="passiveList"></div>
     </div>
   </section>
 
@@ -643,7 +655,7 @@ function renderGroupList(){
     return;
   }
   wrap.innerHTML = groups.map(g=>{
-    const sayi = athletes.filter(a=>a.groupId===g.id).length;
+    const sayi = aktifSporcular().filter(a=>a.groupId===g.id).length;
     return `
     <div class="group-row">
       <div class="athlete-info" style="min-width:0;">
@@ -674,6 +686,11 @@ function fillGroupSelect(){
 function grupAdi(id){
   const g = groups.find(x=>x.id===id);
   return g ? g.name : null;
+}
+
+// Ayrılmamış sporcular. Yoklama, aidat ve istatistikler yalnızca bunları sayar.
+function aktifSporcular(){
+  return athletes.filter(a=>a.active !== false);
 }
 
 async function loadAthletes(){
@@ -795,37 +812,103 @@ function editAthlete(id){
 }
 
 async function deleteAthlete(id){
-  if(!confirm('Bu sporcuyu silmek istediğine emin misin? Yoklama ve aidat geçmişi etkilenmez.')) return;
+  const a = athletes.find(x=>x.id===id);
+  if(!a) return;
+  const odemeSayisi = (payments[id]||[]).length;
+  if(!confirm(`${a.name} KALICI olarak silinsin mi?\n\n${odemeSayisi} ödeme kaydı da silinir ve geri alınamaz.\n\nSporcu sadece kulübü bıraktıysa, silmek yerine "Ayrıldı" işaretlemen daha iyi olur.`)) return;
   athletes = athletes.filter(x=>x.id!==id);
+  delete payments[id];
   await persistAthletes();
+  await persistPayments();
   renderAthleteList();
+  renderGroupList();
   toast('Sporcu silindi');
 }
 
 function renderAthleteList(){
   const wrap = document.getElementById('athleteList');
-  document.getElementById('athleteCount').textContent = athletes.length;
-  if(athletes.length===0){
+  const aramaEl = document.getElementById('athleteSearch');
+  const arama = aramaEl ? aramaEl.value.trim().toLocaleLowerCase('tr') : '';
+
+  const aktifler = aktifSporcular();
+  const pasifler = athletes.filter(a=>a.active === false);
+  document.getElementById('athleteCount').textContent = aktifler.length;
+
+  const suzulmus = arama
+    ? aktifler.filter(a=>a.name.toLocaleLowerCase('tr').includes(arama))
+    : aktifler;
+
+  if(aktifler.length === 0){
     wrap.innerHTML = `<div class="empty">Henüz sporcu eklenmedi.<br>Yukarıdaki formdan ilk sporcunu ekle.</div>`;
-    return;
+  }else if(suzulmus.length === 0){
+    wrap.innerHTML = `<div class="empty">"${escapeHtml(arama)}" ile eşleşen sporcu yok.</div>`;
+  }else{
+    wrap.innerHTML = [...suzulmus].sort((a,b)=>a.name.localeCompare(b.name,'tr')).map(a=>`
+      <div class="athlete-item">
+        <div class="athlete-info" style="min-width:0;">
+          <div class="name"><span class="belt-dot" style="background:${BELT_COLORS[a.belt]||'#ccc'}"></span>${escapeHtml(a.name)}</div>
+          <div class="meta">${a.belt} kuşak · ${a.category} · ₺${a.fee}/ay${grupAdi(a.groupId) ? ' · ' + escapeHtml(grupAdi(a.groupId)) : ''}</div>
+        </div>
+        <div class="actions">
+          ${waButton(a, 'genel')}
+          <button class="icon-btn" onclick="editAthlete('${a.id}')" title="Düzenle">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+          </button>
+          <button class="icon-btn" onclick="sporcuAyrildi('${a.id}')" title="Ayrıldı olarak işaretle">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/><path d="M12 19H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h7"/></svg>
+          </button>
+        </div>
+      </div>
+    `).join('');
   }
-  wrap.innerHTML = [...athletes].sort((a,b)=>a.name.localeCompare(b.name,'tr')).map(a=>`
-    <div class="athlete-item">
-      <div class="athlete-info">
-        <div class="name"><span class="belt-dot" style="background:${BELT_COLORS[a.belt]||'#ccc'}"></span>${escapeHtml(a.name)}</div>
-        <div class="meta">${a.belt} kuşak · ${a.category} · ₺${a.fee}/ay${grupAdi(a.groupId) ? ' · ' + escapeHtml(grupAdi(a.groupId)) : ''}</div>
-      </div>
-      <div class="actions">
-        ${waButton(a, 'genel')}
-        <button class="icon-btn" onclick="editAthlete('${a.id}')" title="Düzenle">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-        </button>
-        <button class="icon-btn" onclick="deleteAthlete('${a.id}')" title="Sil">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg>
-        </button>
-      </div>
-    </div>
-  `).join('');
+
+  // Ayrılanlar
+  const pasifCard = document.getElementById('passiveCard');
+  if(pasifCard){
+    if(pasifler.length === 0){
+      pasifCard.style.display = 'none';
+    }else{
+      pasifCard.style.display = '';
+      document.getElementById('passiveCount').textContent = pasifler.length;
+      document.getElementById('passiveList').innerHTML =
+        [...pasifler].sort((a,b)=>a.name.localeCompare(b.name,'tr')).map(a=>`
+        <div class="athlete-item">
+          <div class="athlete-info" style="min-width:0;">
+            <div class="name" style="opacity:.7;">${escapeHtml(a.name)}</div>
+            <div class="meta">${a.leftDate ? 'ayrıldı: ' + a.leftDate : 'ayrıldı'}${grupAdi(a.groupId) ? ' · ' + escapeHtml(grupAdi(a.groupId)) : ''}</div>
+          </div>
+          <div class="actions">
+            <button class="btn btn-ghost btn-sm" style="margin-top:0;" onclick="sporcuGeriDondu('${a.id}')">Geri döndü</button>
+            <button class="icon-btn" onclick="deleteAthlete('${a.id}')" title="Kalıcı sil">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg>
+            </button>
+          </div>
+        </div>`).join('');
+    }
+  }
+}
+
+async function sporcuAyrildi(id){
+  const a = athletes.find(x=>x.id===id);
+  if(!a) return;
+  if(!confirm(`${a.name} ayrıldı olarak işaretlensin mi?\n\nYoklama ve aidat listelerinden çıkar, geçmiş kayıtları korunur. İstediğin zaman geri alabilirsin.`)) return;
+  a.active = false;
+  a.leftDate = todayStr();
+  await persistAthletes();
+  renderAthleteList();
+  renderGroupList();
+  toast(`${a.name} ayrılanlara taşındı`);
+}
+
+async function sporcuGeriDondu(id){
+  const a = athletes.find(x=>x.id===id);
+  if(!a) return;
+  a.active = true;
+  delete a.leftDate;
+  await persistAthletes();
+  renderAthleteList();
+  renderGroupList();
+  toast(`${a.name} yeniden aktif`);
 }
 
 function escapeHtml(s){
@@ -850,9 +933,10 @@ function ogunkuGruplar(dateStr){
 
 // Ekranda gösterilecek sporcular
 function gosterilecekSporcular(){
-  if(seciliGrupId === null) return athletes;
-  if(seciliGrupId === '__yok__') return athletes.filter(a=>!a.groupId);
-  return athletes.filter(a=>a.groupId === seciliGrupId);
+  const liste = aktifSporcular();
+  if(seciliGrupId === null) return liste;
+  if(seciliGrupId === '__yok__') return liste.filter(a=>!a.groupId);
+  return liste.filter(a=>a.groupId === seciliGrupId);
 }
 
 async function loadAndRenderAttendance(){
@@ -886,7 +970,7 @@ function renderSessionPicker(){
 
   const bugunku = ogunkuGruplar(tarih);
   const bugunkuIds = bugunku.map(g=>g.id);
-  const grupsuzSayi = athletes.filter(a=>!a.groupId).length;
+  const grupsuzSayi = aktifSporcular().filter(a=>!a.groupId).length;
 
   // O gün antrenmanı olanlar üstte
   const sirali = [...groups].sort((a,b)=>{
@@ -898,7 +982,7 @@ function renderSessionPicker(){
 
   let html = '<div class="session-picker">';
   html += sirali.map(g=>{
-    const sayi = athletes.filter(a=>a.groupId===g.id).length;
+    const sayi = aktifSporcular().filter(a=>a.groupId===g.id).length;
     const bugun = bugunkuIds.includes(g.id);
     return `<button class="${seciliGrupId===g.id?'on':''} ${bugun && seciliGrupId!==g.id ?'today-hint':''}"
       onclick="seansSec('${g.id}')">${escapeHtml(g.name)} <span class="cnt">${g.time} · ${sayi}</span></button>`;
@@ -906,7 +990,7 @@ function renderSessionPicker(){
   if(grupsuzSayi > 0){
     html += `<button class="${seciliGrupId==='__yok__'?'on':''}" onclick="seansSec('__yok__')">Grupsuz <span class="cnt">${grupsuzSayi}</span></button>`;
   }
-  html += `<button class="${seciliGrupId===null?'on':''}" onclick="seansSec(null)">Tümü <span class="cnt">${athletes.length}</span></button>`;
+  html += `<button class="${seciliGrupId===null?'on':''}" onclick="seansSec(null)">Tümü <span class="cnt">${aktifSporcular().length}</span></button>`;
   html += '</div>';
 
   if(bugunku.length === 0 && groups.length > 0){
@@ -1072,7 +1156,7 @@ function tahminiTarih(a, kalan){
 
 async function computeDuesStatus(){
   const sonuc = [];
-  for(const a of athletes){
+  for(const a of aktifSporcular()){
     const {sayi, baslangic, sonOdeme: son} = await dersSayaci(a);
     const hedef = donemHedefi(a);
     const kalan = hedef - sayi;
@@ -1223,7 +1307,7 @@ async function computeAttendanceStats(){
   });
 
   const sonuc = [];
-  for(const a of athletes){
+  for(const a of aktifSporcular()){
     let katildi = 0, isaretli = 0;
     for(const d of tarihler){
       const v = kayitlar[d][a.id];
@@ -1259,8 +1343,8 @@ function oranSinifi(oran){
 async function renderAttendanceStats(){
   const wrap = document.getElementById('attendanceStats');
   if(!wrap) return;
-  if(athletes.length === 0){
-    wrap.innerHTML = `<div class="empty">Henüz sporcu yok.</div>`;
+  if(aktifSporcular().length === 0){
+    wrap.innerHTML = `<div class="empty">Henüz aktif sporcu yok.</div>`;
     return;
   }
   const {list, antrenmanSayisi} = await computeAttendanceStats();
@@ -1351,7 +1435,7 @@ async function openWhatsApp(id, tip){
 
 /* ---------------- ÖZET ---------------- */
 async function renderOzet(){
-  document.getElementById('statAthletes').textContent = athletes.length;
+  document.getElementById('statAthletes').textContent = aktifSporcular().length;
 
   const today = todayStr();
   const todayAtt = await loadAttendance(today);
@@ -1391,6 +1475,7 @@ async function renderOzet(){
 
   renderUpcoming();
   renderAttendanceStats();
+  renderBackupWarning();
 }
 
 /* ---------------- YAKLAŞAN ÖDEMELER (SAYAÇ) ---------------- */
@@ -1517,23 +1602,143 @@ async function exportICS(){
   toast('Takvim dosyası indirildi');
 }
 
-async function exportData(){
-  const keys = [...await listKeys('attendance:'), ...await listKeys('dues:')];
-  const out = {athletes: athletes, attendance:{}, dues:{}};
+/* ---------------- YEDEKLEME ---------------- */
+async function yedekVerisi(){
+  const keys = [...await listKeys('attendance:')];
+  const out = {
+    surum: 2,
+    tarih: new Date().toISOString(),
+    kulup: 'Ardeşen Karate Spor Kulübü',
+    athletes: athletes,
+    groups: groups,
+    payments: payments,
+    attendance: {}
+  };
   for(const k of keys){
     const r = await window.storage.get(k, false);
     if(!r) continue;
-    const val = JSON.parse(r.value);
-    if(k.startsWith('attendance:')) out.attendance[k.replace('attendance:','')] = val;
-    else out.dues[k.replace('dues:','')] = val;
+    out.attendance[k.replace('attendance:','')] = JSON.parse(r.value);
   }
-  const blob = new Blob([JSON.stringify(out, null, 2)], {type:'application/json'});
+  return out;
+}
+
+function yedekDosyaAdi(){
+  return `ardesen-karate-yedek-${todayStr()}.json`;
+}
+
+async function yedekIsaretle(){
+  try{ await window.storage.set('lastBackup', todayStr(), false); }catch(e){}
+  renderBackupWarning();
+}
+
+async function sonYedekTarihi(){
+  try{
+    const r = await window.storage.get('lastBackup', false);
+    return r ? r.value : null;
+  }catch(e){ return null; }
+}
+
+// Telefonun paylaşım penceresini açar: WhatsApp, e-posta, Drive, nereye istersen
+async function shareBackup(){
+  const veri = await yedekVerisi();
+  const metin = JSON.stringify(veri, null, 2);
+  const adi = yedekDosyaAdi();
+
+  try{
+    const dosya = new File([metin], adi, {type:'application/json'});
+    if(navigator.canShare && navigator.canShare({files:[dosya]})){
+      await navigator.share({
+        files: [dosya],
+        title: 'Ardeşen Karate yedek',
+        text: `Ardeşen Karate Spor Kulübü verileri · ${todayStr()}`
+      });
+      await yedekIsaretle();
+      toast('Yedek paylaşıldı');
+      return;
+    }
+  }catch(e){
+    if(e && e.name === 'AbortError') return;  // kullanıcı vazgeçti
+  }
+  // Paylaşım desteklenmiyorsa indirmeye düş
+  await exportData();
+}
+
+async function exportData(){
+  const veri = await yedekVerisi();
+  const blob = new Blob([JSON.stringify(veri, null, 2)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = 'ardesen-karate-yedek.json';
+  a.href = url; a.download = yedekDosyaAdi();
   document.body.appendChild(a); a.click(); a.remove();
   URL.revokeObjectURL(url);
+  await yedekIsaretle();
   toast('Yedek indirildi');
+}
+
+async function restoreBackup(input){
+  const dosya = input.files && input.files[0];
+  input.value = '';
+  if(!dosya) return;
+
+  let veri;
+  try{
+    veri = JSON.parse(await dosya.text());
+  }catch(e){
+    toast('Dosya okunamadı, geçerli bir yedek değil');
+    return;
+  }
+  if(!veri || !Array.isArray(veri.athletes)){
+    toast('Bu dosya bir Ardeşen Karate yedeği değil');
+    return;
+  }
+
+  const sporcuSayisi = veri.athletes.length;
+  const gunSayisi = Object.keys(veri.attendance||{}).length;
+  if(!confirm(`Yedek yüklensin mi?\n\n${sporcuSayisi} sporcu · ${gunSayisi} gün yoklama\nYedek tarihi: ${(veri.tarih||'').slice(0,10)}\n\nDİKKAT: Şu anki tüm veriler silinip yedektekiler yazılır.`)) return;
+
+  athletes = veri.athletes || [];
+  groups = veri.groups || [];
+  payments = veri.payments || {};
+
+  await persistAthletes();
+  await persistGroups();
+  await persistPayments();
+
+  // Eski yoklamaları temizle, yedektekileri yaz
+  const eskiler = await listKeys('attendance:');
+  for(const k of eskiler){
+    try{ await window.storage.delete(k, false); }catch(e){}
+  }
+  for(const [tarih, kayit] of Object.entries(veri.attendance||{})){
+    await saveAttendanceData(tarih, kayit);
+  }
+
+  yoklamaOnbelleginiTemizle();
+  fillGroupSelect();
+  renderGroupList();
+  renderAthleteList();
+  renderOzet();
+  toast('Yedek geri yüklendi');
+}
+
+async function renderBackupWarning(){
+  const wrap = document.getElementById('backupWarning');
+  if(!wrap) return;
+  if(athletes.length === 0){ wrap.innerHTML = ''; return; }
+
+  const son = await sonYedekTarihi();
+  if(!son){
+    wrap.innerHTML = `<div class="alert-red" style="margin-bottom:12px;"><strong>Hiç yedek almadın.</strong> Telefon değişirse ya da uygulama silinirse kayıtlar geri gelmez.</div>`;
+    return;
+  }
+  const gecen = daysBetween(son, new Date());
+  if(gecen >= 14){
+    wrap.innerHTML = `<div class="alert-red" style="margin-bottom:12px;"><strong>${gecen} gündür yedek almadın.</strong> Son yedek: ${son}</div>`;
+  }else if(gecen >= 7){
+    wrap.innerHTML = `<div class="upcoming-alert"><strong>${gecen} gündür yedek almadın.</strong> Son yedek: ${son}</div>`;
+  }else{
+    wrap.innerHTML = `<p style="font-family:var(--font-mono); font-size:11.5px; color:var(--green); margin:0 0 10px;">Son yedek: ${son}${gecen>0?' · '+gecen+' gün önce':' · bugün'}</p>`;
+  }
 }
 
 /* ---------------- init ---------------- */

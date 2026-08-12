@@ -1,7 +1,7 @@
 /* Ardeşen Karate Spor Kulübü — Service Worker
    Uygulamayı önbelleğe alır, internet olmadan da açılmasını sağlar. */
 
-const CACHE = 'ardesen-karate-v4';
+const CACHE = 'ardesen-karate-v5';
 
 const DOSYALAR = [
   './',
