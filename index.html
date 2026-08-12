@@ -309,13 +309,13 @@
     <div class="stat-grid">
       <div class="stat red"><div class="num" id="statAthletes">0</div><div class="lbl">Kayıtlı sporcu</div></div>
       <div class="stat green"><div class="num" id="statPresentToday">0</div><div class="lbl">Bugün katılan</div></div>
-      <div class="stat gold"><div class="num" id="statUnpaid">0</div><div class="lbl">Bu ay ödenmemiş</div></div>
+      <div class="stat gold"><div class="num" id="statUnpaid">0</div><div class="lbl">Ödeme sırası geldi</div></div>
       <div class="stat navy"><div class="num" id="statCollected">₺0</div><div class="lbl">Bu ay tahsilat</div></div>
     </div>
 
     <div class="card">
-      <h2>Yaklaşan Ödeme Tarihleri</h2>
-      <p style="font-size:12.5px; color:var(--ink-soft); margin:-6px 0 12px;">Her sporcunun son ödeme tarihinden 1 ay sonrası hesaplanır. 1 gün kala uyarı çıkar.</p>
+      <h2>Yaklaşan Ödemeler</h2>
+      <p style="font-size:12.5px; color:var(--ink-soft); margin:-6px 0 12px;">Ders sayacı dolan ve dolmak üzere olan sporcular. Tahmini tarih grubun antrenman günlerine göre hesaplanır.</p>
       <div id="upcomingList"></div>
     </div>
 
@@ -326,13 +326,13 @@
     </div>
 
     <div class="card">
-      <h2>Ödemesi Bekleyenler</h2>
+      <h2>Ödeme Sırası Gelenler</h2>
       <div id="unpaidList"></div>
     </div>
 
     <div class="card">
       <h2>Hatırlatma</h2>
-      <p style="font-size:13px; color:var(--ink-soft); margin:0 0 10px;">Takvim dosyasını indirip telefonunun takvimine ekle. Her sporcunun ödeme gününden 1 gün önce 09:00'da telefonun alarm verir — uygulama kapalıyken bile.</p>
+      <p style="font-size:13px; color:var(--ink-soft); margin:0 0 10px;">Takvim dosyasını indirip telefonunun takvimine ekle. Ders sayacının dolacağı tahmini günden 1 gün önce alarm verir.</p>
       <button class="btn btn-ghost" style="width:100%;" onclick="exportICS()">Takvim hatırlatmasını indir (.ics)</button>
       <button class="btn btn-ghost" style="width:100%; margin-top:8px;" id="notifBtn" onclick="enableNotifications()">Tarayıcı bildirimlerini aç</button>
     </div>
@@ -376,8 +376,18 @@
           <input type="tel" id="fPhone" placeholder="05xx xxx xx xx">
         </div>
       </div>
-      <label>Grup / Seans</label>
-      <select id="fGroup"></select>
+      <div class="row2">
+        <div>
+          <label>Grup / Seans</label>
+          <select id="fGroup"></select>
+        </div>
+        <div>
+          <label>Kaç derste bir ödeme</label>
+          <input type="number" id="fCycle" placeholder="8" inputmode="numeric" min="1">
+        </div>
+      </div>
+      <label>Başlangıç tarihi (ilk ders)</label>
+      <input type="date" id="fStart">
       <button class="btn btn-primary" onclick="saveAthlete()" id="saveAthleteBtn">Sporcuyu Kaydet</button>
     </div>
 
@@ -437,15 +447,19 @@
   <!-- AİDAT -->
   <section class="view" id="view-aidat">
     <div class="card">
-      <label>Ay</label>
-      <input type="month" id="duesMonth">
-      <div id="duesSummaryLine" style="font-family:var(--font-mono); font-size:12px; color:var(--ink-soft); margin-top:8px;"></div>
+      <h2>Ders Sayacı</h2>
+      <p style="font-size:12.5px; color:var(--ink-soft); margin:-6px 0 10px;">Her sporcu katıldığı ders sayısına göre ilerler. Hedefe ulaşınca ödeme sırası gelir, ödeme alınca sayaç sıfırdan başlar.</p>
+      <div id="duesSummaryLine" style="font-family:var(--font-mono); font-size:12px; color:var(--ink-soft);"></div>
     </div>
 
     <div class="card">
-      <h2>Aidat Durumu</h2>
+      <h2>Sporcular</h2>
       <div id="duesList"></div>
-      <button class="btn btn-primary" onclick="saveDues()">Aidatları Kaydet</button>
+    </div>
+
+    <div class="card">
+      <h2>Son Ödemeler</h2>
+      <div id="paymentHistory"></div>
     </div>
   </section>
 
@@ -734,6 +748,8 @@ function resetForm(){
   document.getElementById('fFee').value='';
   document.getElementById('fPhone').value='';
   document.getElementById('fGroup').value='';
+  document.getElementById('fCycle').value=VARSAYILAN_DONEM;
+  document.getElementById('fStart').value=todayStr();
 }
 
 async function saveAthlete(){
@@ -744,13 +760,15 @@ async function saveAthlete(){
   const fee = parseInt(document.getElementById('fFee').value)||0;
   const phone = document.getElementById('fPhone').value.trim();
   const groupId = document.getElementById('fGroup').value || null;
+  const cycle = parseInt(document.getElementById('fCycle').value) || VARSAYILAN_DONEM;
+  const startDate = document.getElementById('fStart').value || todayStr();
 
   if(editingId){
     const a = athletes.find(x=>x.id===editingId);
-    Object.assign(a, {name, belt, category, fee, phone, groupId});
+    Object.assign(a, {name, belt, category, fee, phone, groupId, cycle, startDate});
     toast('Sporcu güncellendi');
   }else{
-    athletes.push({id:genId(), name, belt, category, fee, phone, groupId, joined: todayStr()});
+    athletes.push({id:genId(), name, belt, category, fee, phone, groupId, cycle, startDate, joined: todayStr()});
     toast('Sporcu eklendi');
   }
   await persistAthletes();
@@ -771,6 +789,8 @@ function editAthlete(id){
   document.getElementById('fFee').value = a.fee;
   document.getElementById('fPhone').value = a.phone||'';
   document.getElementById('fGroup').value = a.groupId||'';
+  document.getElementById('fCycle').value = a.cycle||VARSAYILAN_DONEM;
+  document.getElementById('fStart').value = a.startDate||a.joined||todayStr();
   window.scrollTo({top:0, behavior:'smooth'});
 }
 
@@ -960,6 +980,7 @@ function updateAttSummary(){
 async function saveAttendance(){
   const dateStr = document.getElementById('attDate').value;
   await saveAttendanceData(dateStr, currentAttendance);
+  yoklamaOnbelleginiTemizle();
   toast('Yoklama kaydedildi');
   renderAttHistory();
 }
@@ -979,102 +1000,227 @@ async function renderAttHistory(){
   wrap.innerHTML = rows.join('');
 }
 
-/* ---------------- AİDAT ---------------- */
-let currentDues = {};
+/* ---------------- AİDAT: DERS SAYACI ---------------- */
+/* Model: sporcu katıldığı her ders sayaca eklenir. Hedefe (varsayılan 8)
+   ulaşınca ödeme sırası gelir. Ödeme alınınca sayaç sıfırlanır ve
+   yeni dönem ödeme tarihinden SONRAKİ derslerle başlar. */
 
-async function loadAndRenderDues(){
-  const monthInput = document.getElementById('duesMonth');
-  if(!monthInput.value) monthInput.value = monthStr();
-  currentDues = await loadDuesData(monthInput.value);
-  renderDuesList();
+const VARSAYILAN_DONEM = 8;
+let payments = {};   // { sporcuId: [ {date, amount}, ... ] }
+
+async function loadPayments(){
+  try{
+    const r = await window.storage.get('payments', false);
+    payments = r ? JSON.parse(r.value) : {};
+  }catch(e){ payments = {}; }
+}
+async function persistPayments(){
+  await window.storage.set('payments', JSON.stringify(payments), false);
 }
 
-function renderDuesList(){
+function sonOdeme(id){
+  const list = payments[id];
+  if(!list || !list.length) return null;
+  return [...list].sort((a,b)=>a.date.localeCompare(b.date))[list.length-1];
+}
+
+function donemHedefi(a){
+  return (a.cycle && a.cycle > 0) ? a.cycle : VARSAYILAN_DONEM;
+}
+
+// Tüm yoklamaları tek seferde okur (birden çok hesap aynı veriyi kullansın diye)
+let _yoklamaOnbellek = null;
+async function tumYoklamalar(){
+  if(_yoklamaOnbellek) return _yoklamaOnbellek;
+  const keys = await listKeys('attendance:');
+  const tarihler = keys.map(k=>k.replace('attendance:','')).sort();
+  const kayitlar = {};
+  for(const d of tarihler) kayitlar[d] = await loadAttendance(d);
+  _yoklamaOnbellek = {tarihler, kayitlar};
+  return _yoklamaOnbellek;
+}
+function yoklamaOnbelleginiTemizle(){ _yoklamaOnbellek = null; }
+
+// Sporcunun mevcut dönemde katıldığı ders sayısı
+async function dersSayaci(a){
+  const {tarihler, kayitlar} = await tumYoklamalar();
+  const son = sonOdeme(a.id);
+  const baslangic = son ? son.date : (a.startDate || a.joined || '2000-01-01');
+  let sayi = 0;
+  const katilinanlar = [];
+  for(const d of tarihler){
+    // Ödeme günündeki ders yeni döneme sayılmaz, ödeme o dersin karşılığıdır
+    if(son ? (d <= baslangic) : (d < baslangic)) continue;
+    if(kayitlar[d][a.id] === true){ sayi++; katilinanlar.push(d); }
+  }
+  return {sayi, katilinanlar, baslangic, sonOdeme: son};
+}
+
+// Kalan derse göre tahmini ödeme tarihi (grubun antrenman günlerine bakarak)
+function tahminiTarih(a, kalan){
+  if(kalan <= 0) return null;
+  const g = groups.find(x=>x.id === a.groupId);
+  if(!g || !g.days.length) return null;
+  const d = new Date();
+  let bulunan = 0;
+  for(let i=0; i<400 && bulunan<kalan; i++){
+    d.setDate(d.getDate()+1);
+    if(g.days.includes(d.getDay())) bulunan++;
+  }
+  return bulunan === kalan ? fmtDate(d) : null;
+}
+
+async function computeDuesStatus(){
+  const sonuc = [];
+  for(const a of athletes){
+    const {sayi, baslangic, sonOdeme: son} = await dersSayaci(a);
+    const hedef = donemHedefi(a);
+    const kalan = hedef - sayi;
+    sonuc.push({
+      athlete: a, sayi, hedef, kalan, baslangic, son,
+      hazir: sayi >= hedef,
+      tahmin: kalan > 0 ? tahminiTarih(a, kalan) : null
+    });
+  }
+  sonuc.sort((x,y)=> y.sayi/y.hedef - x.sayi/x.hedef);
+  return sonuc;
+}
+
+async function loadAndRenderDues(){
+  yoklamaOnbelleginiTemizle();
+  await renderDuesList();
+}
+
+function sayacSinifi(x){
+  if(x.hazir) return 'low';           // kırmızı: ödeme zamanı
+  if(x.kalan <= 1) return 'mid';      // sarı: son ders
+  return 'good';
+}
+
+async function renderDuesList(){
   const wrap = document.getElementById('duesList');
-  if(athletes.length===0){
+  if(!wrap) return;
+  if(athletes.length === 0){
     wrap.innerHTML = `<div class="empty">Önce Sporcular sekmesinden sporcu ekle.</div>`;
-    document.getElementById('duesSummaryLine').textContent='';
+    document.getElementById('duesSummaryLine').textContent = '';
+    renderPaymentHistory();
     return;
   }
-  wrap.innerHTML = [...athletes].sort((a,b)=>a.name.localeCompare(b.name,'tr')).map(a=>{
-    const d = currentDues[a.id] || {paid:false, amount:a.fee, date:''};
+
+  const liste = await computeDuesStatus();
+  const hazirlar = liste.filter(x=>x.hazir);
+
+  let html = '';
+  if(hazirlar.length){
+    html += `<div class="alert-red"><strong>Ödeme sırası geldi:</strong> ${hazirlar.map(x=>escapeHtml(x.athlete.name)).join(', ')}</div>`;
+  }
+
+  html += liste.map(x=>{
+    const cls = sayacSinifi(x);
+    const yuzde = Math.min(100, Math.round(x.sayi / x.hedef * 100));
+    let alt;
+    if(x.hazir){
+      alt = `${x.sayi} ders doldu · ödeme alınmalı`;
+    }else if(x.tahmin){
+      alt = `${x.kalan} ders kaldı · tahmini ${x.tahmin}`;
+    }else{
+      alt = `${x.kalan} ders kaldı`;
+    }
+    const sonBilgi = x.son ? `son ödeme ${x.son.date} · ₺${x.son.amount}` : `başlangıç ${x.baslangic}`;
     return `
-    <div class="due-row">
-      <div class="due-top">
-        <div class="athlete-info">
-          <div class="name">${escapeHtml(a.name)}</div>
+    <div class="att-stat-row">
+      <div class="att-stat-top">
+        <div class="athlete-info" style="min-width:0; flex:1;">
+          <div class="name">${escapeHtml(x.athlete.name)}</div>
+          <div class="meta">${alt}</div>
+          <div class="meta" style="opacity:.75;">${sonBilgi}</div>
         </div>
-        <div class="actions">
-          ${d.paid ? '' : waButton(a, 'aidat')}
-          <button class="paid-pill ${d.paid?'yes':'no'}" onclick="toggleDuePaid('${a.id}')">${d.paid?'ÖDENDİ':'ÖDENMEDİ'}</button>
-        </div>
+        ${x.hazir ? waButton(x.athlete, 'aidat') : ''}
+        <div class="rate-num ${cls}">${x.sayi}/${x.hedef}</div>
       </div>
-      <div class="due-bottom">
-        <input type="number" inputmode="numeric" value="${d.amount}" onchange="updateDueAmount('${a.id}', this.value)" placeholder="Tutar">
-        <input type="date" value="${d.date||''}" onchange="updateDueDate('${a.id}', this.value)">
+      <div class="bar-track"><div class="bar-fill ${cls}" style="width:${yuzde}%"></div></div>
+      <div class="due-bottom" style="margin-top:9px;">
+        <input type="number" inputmode="numeric" id="tutar_${x.athlete.id}" value="${x.athlete.fee||0}" placeholder="Tutar">
+        <button class="btn ${x.hazir?'btn-primary':'btn-ghost'} btn-sm" style="margin-top:0; width:auto; flex-shrink:0;" onclick="odemeAl('${x.athlete.id}')">Ödeme Al</button>
       </div>
     </div>`;
   }).join('');
-  updateDuesSummary();
-}
 
-function ensureDue(id){
-  if(!currentDues[id]){
-    const a = athletes.find(x=>x.id===id);
-    currentDues[id] = {paid:false, amount:a?a.fee:0, date:''};
-  }
-  return currentDues[id];
-}
-function toggleDuePaid(id){
-  const d = ensureDue(id);
-  d.paid = !d.paid;
-  if(d.paid && !d.date) d.date = todayStr();
-  renderDuesList();
-}
-function updateDueAmount(id, val){
-  const d = ensureDue(id);
-  d.amount = parseInt(val)||0;
-  updateDuesSummary();
-}
-function updateDueDate(id, val){
-  const d = ensureDue(id);
-  d.date = val;
-}
-function updateDuesSummary(){
-  let collected=0, unpaid=0;
-  athletes.forEach(a=>{
-    const d = currentDues[a.id];
-    if(d && d.paid) collected += (d.amount||0);
-    else unpaid++;
+  wrap.innerHTML = html;
+
+  const buAy = monthStr();
+  let tahsilat = 0;
+  Object.values(payments).forEach(list=>{
+    (list||[]).forEach(p=>{ if(p.date.startsWith(buAy)) tahsilat += (p.amount||0); });
   });
-  document.getElementById('duesSummaryLine').textContent = `₺${collected} tahsil edildi · ${unpaid} sporcu ödemedi`;
+  document.getElementById('duesSummaryLine').textContent =
+    `${hazirlar.length} sporcunun ödeme sırası geldi · bu ay ₺${tahsilat} tahsil edildi`;
+
+  renderPaymentHistory();
 }
 
-async function saveDues(){
-  const m = document.getElementById('duesMonth').value;
-  await saveDuesData(m, currentDues);
-  toast('Aidatlar kaydedildi');
-  if(document.getElementById('view-ozet').classList.contains('active')) renderOzet();
+async function odemeAl(id){
+  const a = athletes.find(x=>x.id===id);
+  if(!a) return;
+  const alan = document.getElementById('tutar_'+id);
+  const tutar = parseInt(alan ? alan.value : 0) || 0;
+  const bugun = todayStr();
+
+  if(!confirm(`${a.name} için ₺${tutar} ödeme kaydedilsin mi?\n\nSayaç sıfırlanır, yeni dönem bugünden sonraki derslerle başlar.`)) return;
+
+  if(!payments[id]) payments[id] = [];
+  payments[id].push({date: bugun, amount: tutar});
+  await persistPayments();
+  toast(`${a.name} · ₺${tutar} kaydedildi`);
+  await renderDuesList();
 }
 
-/* ---------------- ÖZET ---------------- */
+async function odemeSil(id, tarih){
+  if(!confirm('Bu ödeme kaydı silinsin mi? Sayaç yeniden hesaplanır.')) return;
+  payments[id] = (payments[id]||[]).filter(p=>p.date !== tarih);
+  if(!payments[id].length) delete payments[id];
+  await persistPayments();
+  toast('Ödeme silindi');
+  await renderDuesList();
+}
+
+function renderPaymentHistory(){
+  const wrap = document.getElementById('paymentHistory');
+  if(!wrap) return;
+  const hepsi = [];
+  Object.entries(payments).forEach(([id, list])=>{
+    const a = athletes.find(x=>x.id===id);
+    (list||[]).forEach(p=>hepsi.push({id, ad: a ? a.name : 'Silinmiş sporcu', ...p}));
+  });
+  if(!hepsi.length){
+    wrap.innerHTML = `<div class="empty">Henüz ödeme kaydı yok.</div>`;
+    return;
+  }
+  hepsi.sort((x,y)=>y.date.localeCompare(x.date));
+  wrap.innerHTML = hepsi.slice(0,25).map(p=>`
+    <div class="athlete-item">
+      <div class="athlete-info">
+        <div class="name">${escapeHtml(p.ad)}</div>
+        <div class="meta">${p.date}</div>
+      </div>
+      <div class="actions">
+        <span class="paid-pill yes">₺${p.amount}</span>
+        <button class="icon-btn" onclick="odemeSil('${p.id}','${p.date}')" title="Sil">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg>
+        </button>
+      </div>
+    </div>`).join('');
+}
+
 /* ---------------- DEVAM TAKİBİ ---------------- */
-// Son 30 gündeki yoklamaları okur, sporcu başına katılım oranı ve
-// üst üste kaçırılan antrenman sayısını hesaplar.
 async function computeAttendanceStats(){
-  const keys = await listKeys('attendance:');
+  const {tarihler: hepsi, kayitlar} = await tumYoklamalar();
   const bugun = new Date();
   const sinir = new Date(bugun.getFullYear(), bugun.getMonth(), bugun.getDate()-30);
-
-  const tarihler = keys.map(k=>k.replace('attendance:',''))
-    .filter(d=>{
-      const [y,m,g] = d.split('-').map(Number);
-      return new Date(y, m-1, g) >= sinir;
-    })
-    .sort(); // eskiden yeniye
-
-  const kayitlar = {};
-  for(const d of tarihler) kayitlar[d] = await loadAttendance(d);
+  const tarihler = hepsi.filter(d=>{
+    const [y,m,g] = d.split('-').map(Number);
+    return new Date(y, m-1, g) >= sinir;
+  });
 
   const sonuc = [];
   for(const a of athletes){
@@ -1084,7 +1230,6 @@ async function computeAttendanceStats(){
       if(v === true){ katildi++; isaretli++; }
       else if(v === false){ isaretli++; }
     }
-    // En son antrenmandan geriye doğru üst üste kaç kez gelmemiş
     let ustUste = 0;
     for(let i = tarihler.length-1; i >= 0; i--){
       const v = kayitlar[tarihler[i]][a.id];
@@ -1092,13 +1237,11 @@ async function computeAttendanceStats(){
       else if(v === true) break;
     }
     sonuc.push({
-      athlete: a,
-      katildi, isaretli,
+      athlete: a, katildi, isaretli,
       oran: isaretli ? Math.round(katildi/isaretli*100) : null,
       ustUste
     });
   }
-  // Önce riskliler: üst üste kaçıranlar, sonra düşük oranlılar
   sonuc.sort((x,y)=>{
     if(y.ustUste !== x.ustUste) return y.ustUste - x.ustUste;
     return (x.oran===null?101:x.oran) - (y.oran===null?101:y.oran);
@@ -1159,7 +1302,6 @@ async function renderAttendanceStats(){
 }
 
 /* ---------------- WHATSAPP ---------------- */
-// 05xx xxx xx xx / +90 5xx / 5xx... hepsini 905xxxxxxxxx biçimine çevirir
 function normalizePhone(ham){
   if(!ham) return null;
   let s = String(ham).replace(/\D/g,'');
@@ -1167,7 +1309,7 @@ function normalizePhone(ham){
   if(s.startsWith('90') && s.length === 12) return s;
   if(s.startsWith('0')) s = s.slice(1);
   if(s.length === 10 && s.startsWith('5')) return '90' + s;
-  if(s.length >= 11 && s.length <= 15) return s; // yurt dışı numarası olabilir
+  if(s.length >= 11 && s.length <= 15) return s;
   return null;
 }
 
@@ -1196,8 +1338,8 @@ async function openWhatsApp(id, tip){
   let mesaj;
 
   if(tip === 'aidat'){
-    const ay = new Date().toLocaleDateString('tr-TR', {month:'long', year:'numeric'});
-    mesaj = `Merhaba, ${kulup}'nden yazıyorum. ${a.name} için ${ay} aidatı (₺${a.fee}) henüz ödenmemiş görünüyor. Uygun olduğunuzda hatırlatmak istedim. İyi günler.`;
+    const hedef = donemHedefi(a);
+    mesaj = `Merhaba, ${kulup}'nden yazıyorum. ${a.name} ${hedef} derslik dönemini tamamladı, aidat ödemesi (₺${a.fee}) için uygun olduğunuzda hatırlatmak istedim. İyi günler.`;
   }else if(tip === 'devam'){
     mesaj = `Merhaba, ${kulup}'nden yazıyorum. ${a.name}'ı son antrenmanlarda göremedik, bir aksilik var mı diye sormak istedim. İyi günler.`;
   }else{
@@ -1207,6 +1349,7 @@ async function openWhatsApp(id, tip){
   window.open(`https://wa.me/${tel}?text=${encodeURIComponent(mesaj)}`, '_blank');
 }
 
+/* ---------------- ÖZET ---------------- */
 async function renderOzet(){
   document.getElementById('statAthletes').textContent = athletes.length;
 
@@ -1215,33 +1358,33 @@ async function renderOzet(){
   const presentToday = Object.values(todayAtt).filter(v=>v===true).length;
   document.getElementById('statPresentToday').textContent = presentToday;
 
-  const m = monthStr();
-  const dues = await loadDuesData(m);
-  let collected=0, unpaid=0;
-  const unpaidAthletes = [];
-  athletes.forEach(a=>{
-    const d = dues[a.id];
-    if(d && d.paid) collected += (d.amount||0);
-    else { unpaid++; unpaidAthletes.push(a); }
+  yoklamaOnbelleginiTemizle();
+  const durum = await computeDuesStatus();
+  const hazirlar = durum.filter(x=>x.hazir);
+  document.getElementById('statUnpaid').textContent = hazirlar.length;
+
+  const buAy = monthStr();
+  let tahsilat = 0;
+  Object.values(payments).forEach(list=>{
+    (list||[]).forEach(p=>{ if(p.date.startsWith(buAy)) tahsilat += (p.amount||0); });
   });
-  document.getElementById('statUnpaid').textContent = unpaid;
-  document.getElementById('statCollected').textContent = '₺'+collected;
+  document.getElementById('statCollected').textContent = '₺'+tahsilat;
 
   const wrap = document.getElementById('unpaidList');
   if(athletes.length===0){
     wrap.innerHTML = `<div class="empty">Henüz sporcu yok.</div>`;
-  }else if(unpaidAthletes.length===0){
-    wrap.innerHTML = `<div class="empty">Bu ay herkes ödemiş 🎉</div>`;
+  }else if(hazirlar.length===0){
+    wrap.innerHTML = `<div class="empty">Ödeme sırası gelen sporcu yok.</div>`;
   }else{
-    wrap.innerHTML = unpaidAthletes.map(a=>`
+    wrap.innerHTML = hazirlar.map(x=>`
       <div class="athlete-item">
         <div class="athlete-info">
-          <div class="name">${escapeHtml(a.name)}</div>
-          <div class="meta">₺${a.fee}/ay bekleniyor</div>
+          <div class="name">${escapeHtml(x.athlete.name)}</div>
+          <div class="meta">${x.sayi} ders doldu · ₺${x.athlete.fee} bekleniyor</div>
         </div>
         <div class="actions">
-          ${waButton(a, 'aidat')}
-          <span class="paid-pill no">ÖDENMEDİ</span>
+          ${waButton(x.athlete, 'aidat')}
+          <span class="paid-pill no">ÖDEME ZAMANI</span>
         </div>
       </div>`).join('');
   }
@@ -1250,7 +1393,7 @@ async function renderOzet(){
   renderAttendanceStats();
 }
 
-/* ---------------- YAKLAŞAN ÖDEMELER ---------------- */
+/* ---------------- YAKLAŞAN ÖDEMELER (SAYAÇ) ---------------- */
 function addMonths(dateStr, n){
   const [y,m,d] = dateStr.split('-').map(Number);
   const dt = new Date(y, m-1+n, 1);
@@ -1268,63 +1411,48 @@ function daysBetween(fromStr, toDate){
   return Math.round((b-a)/86400000);
 }
 
-// Her sporcu için en son ödeme tarihini bulur, +1 ay ekleyerek sıradaki ödeme gününü hesaplar
-async function computeUpcoming(){
-  const keys = await listKeys('dues:');
-  const lastPaid = {};
-  for(const k of keys){
-    const data = await loadDuesData(k.replace('dues:',''));
-    for(const [id, d] of Object.entries(data)){
-      if(d && d.paid && d.date){
-        if(!lastPaid[id] || d.date > lastPaid[id]) lastPaid[id] = d.date;
-      }
-    }
-  }
-  const today = todayStr();
-  const list = [];
-  for(const a of athletes){
-    if(!lastPaid[a.id]) continue;
-    const nextDue = addMonths(lastPaid[a.id], 1);
-    list.push({
-      athlete: a,
-      lastPaid: lastPaid[a.id],
-      nextDue: fmtDate(nextDue),
-      daysLeft: daysBetween(today, nextDue)
-    });
-  }
-  list.sort((x,y)=>x.daysLeft-y.daysLeft);
-  return list;
-}
-
 async function renderUpcoming(){
   const wrap = document.getElementById('upcomingList');
-  const list = await computeUpcoming();
-  if(list.length===0){
-    wrap.innerHTML = `<div class="empty">Henüz ödeme tarihi girilmemiş.<br>Aidat sekmesinden bir ödeme kaydet, sıradaki tarih burada çıksın.</div>`;
+  if(!wrap) return;
+  if(athletes.length === 0){
+    wrap.innerHTML = `<div class="empty">Henüz sporcu yok.</div>`;
     return;
   }
-  const alerts = list.filter(x=>x.daysLeft<=1);
+  yoklamaOnbelleginiTemizle();
+  const liste = await computeDuesStatus();
+  const hazirlar = liste.filter(x=>x.hazir);
+  const yaklasanlar = liste.filter(x=>!x.hazir && x.kalan <= 2);
+
   let html = '';
-  if(alerts.length){
-    html += `<div class="upcoming-alert"><strong>Dikkat:</strong> ${alerts.map(x=>escapeHtml(x.athlete.name)).join(', ')} için ödeme günü ${alerts.some(x=>x.daysLeft<0)?'geldi ya da geçti':'yarın'}.</div>`;
+  if(hazirlar.length){
+    html += `<div class="alert-red"><strong>Ödeme sırası geldi:</strong> ${hazirlar.map(x=>escapeHtml(x.athlete.name)).join(', ')}. Aidat sekmesinden ödeme alabilirsin.</div>`;
   }
-  html += list.map(x=>{
-    let label, cls;
-    if(x.daysLeft < 0){ label = Math.abs(x.daysLeft)+' GÜN GECİKTİ'; cls='no'; }
-    else if(x.daysLeft === 0){ label = 'BUGÜN'; cls='no'; }
-    else if(x.daysLeft === 1){ label = 'YARIN'; cls='warn'; }
-    else { label = x.daysLeft+' GÜN KALDI'; cls='calm'; }
+  if(!hazirlar.length && !yaklasanlar.length){
+    wrap.innerHTML = html + `<div class="empty">Yaklaşan ödeme yok.<br>Sporcular ders sayacında ilerliyor.</div>`;
+    return;
+  }
+
+  html += [...hazirlar, ...yaklasanlar].map(x=>{
+    const cls = sayacSinifi(x);
+    let etiket, alt;
+    if(x.hazir){ etiket = 'ÖDEME ZAMANI'; alt = `${x.sayi} ders doldu`; }
+    else if(x.kalan === 1){ etiket = 'SON DERS'; alt = x.tahmin ? `tahmini ${x.tahmin}` : '1 ders kaldı'; }
+    else { etiket = x.kalan + ' DERS KALDI'; alt = x.tahmin ? `tahmini ${x.tahmin}` : ''; }
     return `
     <div class="athlete-item">
       <div class="athlete-info">
         <div class="name">${escapeHtml(x.athlete.name)}</div>
-        <div class="meta">${x.nextDue} · son ödeme ${x.lastPaid}</div>
+        <div class="meta">${alt}</div>
       </div>
-      <span class="paid-pill ${cls}">${label}</span>
+      <div class="actions">
+        ${x.hazir ? waButton(x.athlete, 'aidat') : ''}
+        <span class="paid-pill ${x.hazir?'no':(x.kalan<=1?'warn':'calm')}">${etiket}</span>
+      </div>
     </div>`;
   }).join('');
+
   wrap.innerHTML = html;
-  maybeNotify(alerts);
+  maybeNotify(hazirlar.map(x=>({athlete:x.athlete, daysLeft:0, nextDue:'ders doldu'})));
 }
 
 /* ---------------- BİLDİRİM ---------------- */
@@ -1359,24 +1487,23 @@ function sessionStorage_set(k,v){ _notifiedFlags[k]=v; }
 
 /* ---------------- TAKVİM (.ics) ---------------- */
 async function exportICS(){
-  const list = await computeUpcoming();
-  if(list.length===0){ toast('Önce bir ödeme tarihi kaydet'); return; }
+  yoklamaOnbelleginiTemizle();
+  const liste = (await computeDuesStatus()).filter(x=>x.tahmin);
+  if(liste.length === 0){ toast('Tahmini tarih için sporcuların bir gruba atanmış olması gerekir'); return; }
   const pad = n=>String(n).padStart(2,'0');
   const stamp = (()=>{ const d=new Date(); return d.getUTCFullYear()+pad(d.getUTCMonth()+1)+pad(d.getUTCDate())+'T'+pad(d.getUTCHours())+pad(d.getUTCMinutes())+'00Z'; })();
 
   let ics = 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Ardesen Karate//Aidat//TR\r\nCALSCALE:GREGORIAN\r\n';
-  list.forEach((x,i)=>{
-    const [y,m,d] = x.nextDue.split('-');
-    // Etkinlik ödeme gününde, alarm 1 gün önce 09:00
+  liste.forEach((x,i)=>{
+    const [y,m,d] = x.tahmin.split('-');
     ics += 'BEGIN:VEVENT\r\n';
     ics += `UID:aidat-${x.athlete.id}-${i}@ardesenkarate\r\n`;
     ics += `DTSTAMP:${stamp}\r\n`;
     ics += `DTSTART;VALUE=DATE:${y}${m}${d}\r\n`;
-    ics += 'RRULE:FREQ=MONTHLY\r\n';
-    ics += `SUMMARY:Aidat - ${x.athlete.name} (₺${x.athlete.fee})\r\n`;
-    ics += `DESCRIPTION:Ardesen Karate Spor Kulubu aidat odemesi\r\n`;
+    ics += `SUMMARY:Aidat - ${x.athlete.name} (${x.hedef}. ders, ₺${x.athlete.fee})\r\n`;
+    ics += 'DESCRIPTION:Ardesen Karate - ders sayaci doluyor\r\n';
     ics += 'BEGIN:VALARM\r\nTRIGGER:-PT15H\r\nACTION:DISPLAY\r\n';
-    ics += `DESCRIPTION:Yarin ${x.athlete.name} aidat odeme gunu\r\n`;
+    ics += `DESCRIPTION:Yarin ${x.athlete.name} icin ders sayaci doluyor\r\n`;
     ics += 'END:VALARM\r\nEND:VEVENT\r\n';
   });
   ics += 'END:VCALENDAR\r\n';
@@ -1415,6 +1542,7 @@ async function init(){
   document.getElementById('dateBadge').textContent = d.toLocaleDateString('tr-TR', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
   await loadGroups();
   await loadAthletes();
+  await loadPayments();
   fillGroupSelect();
   renderGroupList();
 
