@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "io.github.plasher361.twa",
+        "sha256_cert_fingerprints": ["29:42:BA:58:4C:DE:FD:47:2D:D3:E9:01:1C:C7:8F:C7:6C:5E:07:99:4E:13:C1:29:76:BF:E4:68:C1:57:11:99"]
+      }
+    }]
