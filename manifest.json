@@ -1,0 +1,71 @@
+{
+  "name": "Ardeşen Karate Spor Kulübü — Sporcu Takip",
+  "short_name": "Ardeşen Karate",
+  "description": "Ardeşen Karate Spor Kulübü için sporcu kaydı, antrenman yoklaması ve aylık aidat takibi. Çevrimdışı çalışır.",
+  "id": "/",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#EEF3F8",
+  "theme_color": "#0E2648",
+  "lang": "tr",
+  "dir": "ltr",
+  "categories": [
+    "sports",
+    "productivity",
+    "utilities"
+  ],
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Yoklama al",
+      "short_name": "Yoklama",
+      "description": "Bugünün antrenman yoklamasını gir",
+      "url": "./index.html#yoklama",
+      "icons": [
+        {
+          "src": "icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Aidat gir",
+      "short_name": "Aidat",
+      "description": "Bu ayın aidat ödemelerini işaretle",
+      "url": "./index.html#aidat",
+      "icons": [
+        {
+          "src": "icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
+}
