@@ -222,6 +222,31 @@
   .wa-btn:active{background:#C9E9D3;}
   .wa-btn svg{width:19px; height:19px;}
   .wa-btn.off{background:#EEF1F5; color:#A9B6C6;}
+  /* Gün seçici */
+  .day-picker{display:flex; gap:5px; flex-wrap:wrap;}
+  .day-picker button{
+    flex:1; min-width:40px; padding:9px 4px; border-radius:8px; background:#F7FAFD;
+    border:1px solid var(--line); font-size:12.5px; font-weight:600; color:var(--ink-soft);
+    font-family:var(--font-body);
+  }
+  .day-picker button.on{background:var(--navy); color:#fff; border-color:var(--navy);}
+  /* Seans seçici */
+  .session-picker{display:flex; gap:7px; flex-wrap:wrap;}
+  .session-picker button{
+    padding:9px 13px; border-radius:999px; background:#F7FAFD; border:1px solid var(--line);
+    font-size:13px; font-weight:600; color:var(--ink-soft); font-family:var(--font-body);
+    display:flex; align-items:center; gap:6px;
+  }
+  .session-picker button.on{background:var(--ink); color:#fff; border-color:var(--ink);}
+  .session-picker button .cnt{
+    font-family:var(--font-mono); font-size:11px; opacity:.75;
+  }
+  .session-picker button.today-hint{border-color:var(--navy); border-style:dashed;}
+  .group-row{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:11px 4px; border-bottom:1px solid var(--line);
+  }
+  .group-row:last-child{border-bottom:none;}
 
   .empty{
     text-align:center; padding:34px 10px; color:var(--ink-soft); font-size:13.5px;
@@ -351,7 +376,33 @@
           <input type="tel" id="fPhone" placeholder="05xx xxx xx xx">
         </div>
       </div>
+      <label>Grup / Seans</label>
+      <select id="fGroup"></select>
       <button class="btn btn-primary" onclick="saveAthlete()" id="saveAthleteBtn">Sporcuyu Kaydet</button>
+    </div>
+
+    <div class="card">
+      <h2>Gruplar / Seanslar</h2>
+      <p style="font-size:12.5px; color:var(--ink-soft); margin:-6px 0 12px;">Antrenman günü ve saatine göre grup tanımla. Yoklamada sadece o grubun sporcuları çıkar.</p>
+      <div id="groupList"></div>
+
+      <div id="groupForm" style="border-top:1px solid var(--line); margin-top:12px; padding-top:14px;">
+        <label>Grup adı</label>
+        <input type="text" id="gName" placeholder="Örn. Minikler 18:00">
+        <label>Antrenman günleri</label>
+        <div class="day-picker" id="gDays">
+          <button type="button" data-day="1" onclick="toggleGunSec(1)">Pzt</button>
+          <button type="button" data-day="2" onclick="toggleGunSec(2)">Sal</button>
+          <button type="button" data-day="3" onclick="toggleGunSec(3)">Çar</button>
+          <button type="button" data-day="4" onclick="toggleGunSec(4)">Per</button>
+          <button type="button" data-day="5" onclick="toggleGunSec(5)">Cum</button>
+          <button type="button" data-day="6" onclick="toggleGunSec(6)">Cmt</button>
+          <button type="button" data-day="0" onclick="toggleGunSec(0)">Paz</button>
+        </div>
+        <label>Saat</label>
+        <input type="time" id="gTime" value="18:00">
+        <button class="btn btn-primary" onclick="saveGroup()" id="saveGroupBtn">Grubu Kaydet</button>
+      </div>
     </div>
 
     <div class="card">
@@ -365,11 +416,14 @@
     <div class="card">
       <label>Tarih</label>
       <input type="date" id="attDate">
+      <label>Seans</label>
+      <div id="sessionPicker"></div>
       <div id="attSummaryLine" style="font-family:var(--font-mono); font-size:12px; color:var(--ink-soft); margin-top:8px;"></div>
     </div>
 
     <div class="card">
       <h2>Yoklama Al</h2>
+      <button class="btn btn-ghost btn-sm" style="margin-bottom:10px;" onclick="hepsiVar()">Hepsini "var" işaretle</button>
       <div id="attList"></div>
       <button class="btn btn-primary" onclick="saveAttendance()">Yoklamayı Kaydet</button>
     </div>
@@ -475,6 +529,139 @@ let athletes = [];
 let editingId = null;
 
 /* ---------------- storage helpers ---------------- */
+/* ---------------- GRUPLAR / SEANSLAR ---------------- */
+let groups = [];
+let editingGroupId = null;
+let seciliGunler = [];
+
+const GUN_ADLARI = {0:'Paz', 1:'Pzt', 2:'Sal', 3:'Çar', 4:'Per', 5:'Cum', 6:'Cmt'};
+
+async function loadGroups(){
+  try{
+    const r = await window.storage.get('groups', false);
+    groups = r ? JSON.parse(r.value) : [];
+  }catch(e){ groups = []; }
+}
+async function persistGroups(){
+  await window.storage.set('groups', JSON.stringify(groups), false);
+}
+
+function toggleGunSec(gun){
+  const i = seciliGunler.indexOf(gun);
+  if(i === -1) seciliGunler.push(gun);
+  else seciliGunler.splice(i,1);
+  document.querySelectorAll('#gDays button').forEach(b=>{
+    b.classList.toggle('on', seciliGunler.includes(Number(b.dataset.day)));
+  });
+}
+
+function resetGroupForm(){
+  editingGroupId = null;
+  seciliGunler = [];
+  document.getElementById('gName').value = '';
+  document.getElementById('gTime').value = '18:00';
+  document.getElementById('saveGroupBtn').textContent = 'Grubu Kaydet';
+  document.querySelectorAll('#gDays button').forEach(b=>b.classList.remove('on'));
+}
+
+async function saveGroup(){
+  const name = document.getElementById('gName').value.trim();
+  const time = document.getElementById('gTime').value;
+  if(!name){ toast('Grup adı gerekli'); return; }
+  if(seciliGunler.length === 0){ toast('En az bir gün seç'); return; }
+
+  if(editingGroupId){
+    const g = groups.find(x=>x.id===editingGroupId);
+    Object.assign(g, {name, days:[...seciliGunler], time});
+    toast('Grup güncellendi');
+  }else{
+    groups.push({id:'g_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+                 name, days:[...seciliGunler], time});
+    toast('Grup eklendi');
+  }
+  await persistGroups();
+  resetGroupForm();
+  renderGroupList();
+  fillGroupSelect();
+  renderAthleteList();
+}
+
+function editGroup(id){
+  const g = groups.find(x=>x.id===id);
+  if(!g) return;
+  editingGroupId = id;
+  seciliGunler = [...g.days];
+  document.getElementById('gName').value = g.name;
+  document.getElementById('gTime').value = g.time;
+  document.getElementById('saveGroupBtn').textContent = 'Değişiklikleri Kaydet';
+  document.querySelectorAll('#gDays button').forEach(b=>{
+    b.classList.toggle('on', seciliGunler.includes(Number(b.dataset.day)));
+  });
+  document.getElementById('groupForm').scrollIntoView({behavior:'smooth', block:'center'});
+}
+
+async function deleteGroup(id){
+  const sayi = athletes.filter(a=>a.groupId===id).length;
+  const uyari = sayi
+    ? `Bu grupta ${sayi} sporcu var. Grup silinince onlar "grupsuz" olur, kayıtları durur. Devam edilsin mi?`
+    : 'Bu grup silinsin mi?';
+  if(!confirm(uyari)) return;
+  groups = groups.filter(x=>x.id!==id);
+  athletes.forEach(a=>{ if(a.groupId===id) a.groupId = null; });
+  await persistGroups();
+  await persistAthletes();
+  renderGroupList();
+  fillGroupSelect();
+  renderAthleteList();
+  toast('Grup silindi');
+}
+
+function gunlerYazi(g){
+  const sirali = [1,2,3,4,5,6,0].filter(d=>g.days.includes(d));
+  return sirali.map(d=>GUN_ADLARI[d]).join(' · ');
+}
+
+function renderGroupList(){
+  const wrap = document.getElementById('groupList');
+  if(!wrap) return;
+  if(groups.length === 0){
+    wrap.innerHTML = `<div class="empty">Henüz grup yok.<br>Aşağıdan ilk seansını tanımla.</div>`;
+    return;
+  }
+  wrap.innerHTML = groups.map(g=>{
+    const sayi = athletes.filter(a=>a.groupId===g.id).length;
+    return `
+    <div class="group-row">
+      <div class="athlete-info" style="min-width:0;">
+        <div class="name">${escapeHtml(g.name)}</div>
+        <div class="meta">${gunlerYazi(g)} · ${g.time} · ${sayi} sporcu</div>
+      </div>
+      <div class="actions">
+        <button class="icon-btn" onclick="editGroup('${g.id}')" title="Düzenle">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+        </button>
+        <button class="icon-btn" onclick="deleteGroup('${g.id}')" title="Sil">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg>
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function fillGroupSelect(){
+  const sel = document.getElementById('fGroup');
+  if(!sel) return;
+  const mevcut = sel.value;
+  sel.innerHTML = '<option value="">— Grup seçilmedi —</option>' +
+    groups.map(g=>`<option value="${g.id}">${escapeHtml(g.name)} (${gunlerYazi(g)} ${g.time})</option>`).join('');
+  if(mevcut) sel.value = mevcut;
+}
+
+function grupAdi(id){
+  const g = groups.find(x=>x.id===id);
+  return g ? g.name : null;
+}
+
 async function loadAthletes(){
   try{
     const r = await window.storage.get('athletes', false);
@@ -546,6 +733,7 @@ function resetForm(){
   document.getElementById('fCategory').value='Minikler';
   document.getElementById('fFee').value='';
   document.getElementById('fPhone').value='';
+  document.getElementById('fGroup').value='';
 }
 
 async function saveAthlete(){
@@ -555,18 +743,20 @@ async function saveAthlete(){
   const category = document.getElementById('fCategory').value;
   const fee = parseInt(document.getElementById('fFee').value)||0;
   const phone = document.getElementById('fPhone').value.trim();
+  const groupId = document.getElementById('fGroup').value || null;
 
   if(editingId){
     const a = athletes.find(x=>x.id===editingId);
-    Object.assign(a, {name, belt, category, fee, phone});
+    Object.assign(a, {name, belt, category, fee, phone, groupId});
     toast('Sporcu güncellendi');
   }else{
-    athletes.push({id:genId(), name, belt, category, fee, phone, joined: todayStr()});
+    athletes.push({id:genId(), name, belt, category, fee, phone, groupId, joined: todayStr()});
     toast('Sporcu eklendi');
   }
   await persistAthletes();
   resetForm();
   renderAthleteList();
+  renderGroupList();
 }
 
 function editAthlete(id){
@@ -580,6 +770,7 @@ function editAthlete(id){
   document.getElementById('fCategory').value = a.category;
   document.getElementById('fFee').value = a.fee;
   document.getElementById('fPhone').value = a.phone||'';
+  document.getElementById('fGroup').value = a.groupId||'';
   window.scrollTo({top:0, behavior:'smooth'});
 }
 
@@ -602,7 +793,7 @@ function renderAthleteList(){
     <div class="athlete-item">
       <div class="athlete-info">
         <div class="name"><span class="belt-dot" style="background:${BELT_COLORS[a.belt]||'#ccc'}"></span>${escapeHtml(a.name)}</div>
-        <div class="meta">${a.belt} kuşak · ${a.category} · ₺${a.fee}/ay</div>
+        <div class="meta">${a.belt} kuşak · ${a.category} · ₺${a.fee}/ay${grupAdi(a.groupId) ? ' · ' + escapeHtml(grupAdi(a.groupId)) : ''}</div>
       </div>
       <div class="actions">
         ${waButton(a, 'genel')}
@@ -623,13 +814,91 @@ function escapeHtml(s){
 
 /* ---------------- YOKLAMA ---------------- */
 let currentAttendance = {};
+let seciliGrupId = null;   // null = tüm sporcular
+
+// Seçilen tarihin haftanın hangi günü olduğu (0=Paz ... 6=Cmt)
+function tarihinGunu(dateStr){
+  const [y,m,g] = dateStr.split('-').map(Number);
+  return new Date(y, m-1, g).getDay();
+}
+
+// O tarihte antrenmanı olan gruplar
+function ogunkuGruplar(dateStr){
+  const gun = tarihinGunu(dateStr);
+  return groups.filter(g=>g.days.includes(gun));
+}
+
+// Ekranda gösterilecek sporcular
+function gosterilecekSporcular(){
+  if(seciliGrupId === null) return athletes;
+  if(seciliGrupId === '__yok__') return athletes.filter(a=>!a.groupId);
+  return athletes.filter(a=>a.groupId === seciliGrupId);
+}
 
 async function loadAndRenderAttendance(){
   const dateInput = document.getElementById('attDate');
   if(!dateInput.value) dateInput.value = todayStr();
   currentAttendance = await loadAttendance(dateInput.value);
+
+  // Tarih değişince, o güne ait tek seans varsa otomatik seç
+  const bugunku = ogunkuGruplar(dateInput.value);
+  if(seciliGrupId !== null && seciliGrupId !== '__yok__' && !groups.find(g=>g.id===seciliGrupId)){
+    seciliGrupId = null;
+  }
+  if(seciliGrupId === null && bugunku.length === 1){
+    seciliGrupId = bugunku[0].id;
+  }
+
+  renderSessionPicker();
   renderAttList();
   renderAttHistory();
+}
+
+function renderSessionPicker(){
+  const wrap = document.getElementById('sessionPicker');
+  if(!wrap) return;
+  const tarih = document.getElementById('attDate').value;
+
+  if(groups.length === 0){
+    wrap.innerHTML = `<p style="font-size:12.5px; color:var(--ink-soft); margin:2px 0 0;">Grup tanımlanmamış. Sporcular sekmesinden seanslarını ekleyebilirsin.</p>`;
+    return;
+  }
+
+  const bugunku = ogunkuGruplar(tarih);
+  const bugunkuIds = bugunku.map(g=>g.id);
+  const grupsuzSayi = athletes.filter(a=>!a.groupId).length;
+
+  // O gün antrenmanı olanlar üstte
+  const sirali = [...groups].sort((a,b)=>{
+    const af = bugunkuIds.includes(a.id) ? 0 : 1;
+    const bf = bugunkuIds.includes(b.id) ? 0 : 1;
+    if(af !== bf) return af - bf;
+    return (a.time||'').localeCompare(b.time||'');
+  });
+
+  let html = '<div class="session-picker">';
+  html += sirali.map(g=>{
+    const sayi = athletes.filter(a=>a.groupId===g.id).length;
+    const bugun = bugunkuIds.includes(g.id);
+    return `<button class="${seciliGrupId===g.id?'on':''} ${bugun && seciliGrupId!==g.id ?'today-hint':''}"
+      onclick="seansSec('${g.id}')">${escapeHtml(g.name)} <span class="cnt">${g.time} · ${sayi}</span></button>`;
+  }).join('');
+  if(grupsuzSayi > 0){
+    html += `<button class="${seciliGrupId==='__yok__'?'on':''}" onclick="seansSec('__yok__')">Grupsuz <span class="cnt">${grupsuzSayi}</span></button>`;
+  }
+  html += `<button class="${seciliGrupId===null?'on':''}" onclick="seansSec(null)">Tümü <span class="cnt">${athletes.length}</span></button>`;
+  html += '</div>';
+
+  if(bugunku.length === 0 && groups.length > 0){
+    html += `<p style="font-size:12px; color:var(--ink-soft); margin:9px 0 0;">${GUN_ADLARI[tarihinGunu(tarih)]} günü tanımlı antrenman yok — yine de yoklama alabilirsin.</p>`;
+  }
+  wrap.innerHTML = html;
+}
+
+function seansSec(id){
+  seciliGrupId = id;
+  renderSessionPicker();
+  renderAttList();
 }
 
 function renderAttList(){
@@ -639,8 +908,14 @@ function renderAttList(){
     document.getElementById('attSummaryLine').textContent='';
     return;
   }
-  wrap.innerHTML = [...athletes].sort((a,b)=>a.name.localeCompare(b.name,'tr')).map(a=>{
-    const status = currentAttendance[a.id]; // true=present, false=absent, undefined=unset
+  const liste = gosterilecekSporcular();
+  if(liste.length === 0){
+    wrap.innerHTML = `<div class="empty">Bu seansta sporcu yok.<br>Sporcular sekmesinden sporcuları bu gruba ata.</div>`;
+    updateAttSummary();
+    return;
+  }
+  wrap.innerHTML = [...liste].sort((a,b)=>a.name.localeCompare(b.name,'tr')).map(a=>{
+    const status = currentAttendance[a.id]; // true=geldi, false=gelmedi, undefined=işaretsiz
     return `
     <div class="att-row">
       <div class="athlete-info">
@@ -660,11 +935,26 @@ function setAtt(id, val){
   renderAttList();
 }
 
+function hepsiVar(){
+  gosterilecekSporcular().forEach(a=>{ currentAttendance[a.id] = true; });
+  renderAttList();
+  toast('Hepsi "var" işaretlendi');
+}
+
 function updateAttSummary(){
-  const present = Object.values(currentAttendance).filter(v=>v===true).length;
-  const marked = Object.keys(currentAttendance).length;
+  const liste = gosterilecekSporcular();
+  const ids = new Set(liste.map(a=>a.id));
+  let katildi=0, isaretli=0;
+  for(const [id,v] of Object.entries(currentAttendance)){
+    if(!ids.has(id)) continue;
+    isaretli++;
+    if(v===true) katildi++;
+  }
+  const seansAdi = seciliGrupId === null ? 'Tüm sporcular'
+    : seciliGrupId === '__yok__' ? 'Grupsuz sporcular'
+    : (grupAdi(seciliGrupId) || 'Seans');
   document.getElementById('attSummaryLine').textContent =
-    `${present} katıldı · ${marked} sporcu işaretlendi · ${athletes.length} toplam sporcu`;
+    `${seansAdi} · ${katildi} katıldı · ${isaretli} / ${liste.length} işaretlendi`;
 }
 
 async function saveAttendance(){
@@ -846,9 +1136,11 @@ async function renderAttendanceStats(){
   html += list.map(x=>{
     const cls = oranSinifi(x.oran);
     const oranYazi = x.oran === null ? '—' : x.oran + '%';
-    const alt = x.isaretli === 0
+    const grup = grupAdi(x.athlete.groupId);
+    const alt = (x.isaretli === 0
       ? 'Bu dönem yoklamada işaretlenmemiş'
-      : `${x.katildi} / ${x.isaretli} antrenman` + (x.ustUste >= 2 ? ` · üst üste ${x.ustUste} kez gelmedi` : '');
+      : `${x.katildi} / ${x.isaretli} antrenman` + (x.ustUste >= 2 ? ` · üst üste ${x.ustUste} kez gelmedi` : ''))
+      + (grup ? ' · ' + escapeHtml(grup) : '');
     return `
     <div class="att-stat-row">
       <div class="att-stat-top">
@@ -1121,7 +1413,20 @@ async function exportData(){
 async function init(){
   const d = new Date();
   document.getElementById('dateBadge').textContent = d.toLocaleDateString('tr-TR', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+  await loadGroups();
   await loadAthletes();
+  fillGroupSelect();
+  renderGroupList();
+
+  // Tarih değişince o güne ait seansları yeniden göster
+  const dateInput = document.getElementById('attDate');
+  if(dateInput){
+    dateInput.addEventListener('change', ()=>{
+      seciliGrupId = null;
+      loadAndRenderAttendance();
+    });
+  }
+
   const si = document.getElementById('storageInfo');
   if(si) si.textContent = window.__depolama === 'cihaz'
     ? 'Veriler bu cihazın hafızasında · internet gerekmez'
