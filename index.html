@@ -248,6 +248,29 @@
     padding:11px 4px; border-bottom:1px solid var(--line);
   }
   .group-row:last-child{border-bottom:none;}
+  /* Performans: puan seçici */
+  .rating-picker{display:flex; gap:8px;}
+  .rating-picker button{
+    flex:1; padding:12px 0; border-radius:10px; background:#F7FAFD; border:1px solid var(--line);
+    font-family:var(--font-display); font-size:18px; font-weight:600; color:var(--ink-soft);
+  }
+  .rating-picker button.on{background:var(--navy); color:#fff; border-color:var(--navy);}
+  .insight-verdict{
+    font-size:15px; font-weight:600; margin:0 0 10px; line-height:1.5;
+  }
+  .insight-item{
+    display:flex; gap:10px; padding:9px 2px; border-bottom:1px solid var(--line); font-size:13.5px; line-height:1.5;
+  }
+  .insight-item:last-child{border-bottom:none;}
+  .insight-icon{flex-shrink:0; width:20px; height:20px; margin-top:1px;}
+  .trend-up{color:var(--green);}
+  .trend-down{color:var(--red);}
+  .trend-flat{color:var(--ink-soft);}
+  .perf-row{padding:12px 4px; border-bottom:1px solid var(--line);}
+  .perf-row:last-child{border-bottom:none;}
+  .perf-top{display:flex; justify-content:space-between; align-items:baseline;}
+  .perf-metrics{font-family:var(--font-mono); font-size:12px; color:var(--ink-soft); margin-top:4px;}
+  .perf-note{font-size:13px; color:var(--ink-soft); margin-top:4px; font-style:italic;}
 
   .empty{
     text-align:center; padding:34px 10px; color:var(--ink-soft); font-size:13.5px;
@@ -475,6 +498,51 @@
     </div>
   </section>
 
+  <!-- PERFORMANS -->
+  <section class="view" id="view-performans">
+    <div class="card">
+      <h2>Antrenman Kaydı</h2>
+      <p style="font-size:12.5px; color:var(--ink-soft); margin:-6px 0 12px;">Doldurduğun alanlar geçmişle otomatik kıyaslanır. Hepsini doldurman gerekmiyor.</p>
+      <label>Sporcu</label>
+      <select id="pAthlete" onchange="renderPerfHistory()"></select>
+      <label>Tarih</label>
+      <input type="date" id="pDate">
+      <div class="row2">
+        <div>
+          <label>Koşu temposu (dk:sn / km)</label>
+          <input type="text" id="pPace" placeholder="örn. 5:20" inputmode="numeric">
+        </div>
+        <div>
+          <label>Dayanıklılık (dakika)</label>
+          <input type="number" id="pDuration" placeholder="örn. 25" inputmode="numeric">
+        </div>
+      </div>
+      <label>Teknik tekrar sayısı</label>
+      <input type="number" id="pReps" placeholder="örn. 40" inputmode="numeric">
+      <label>Genel performans</label>
+      <div class="rating-picker" id="pRating">
+        <button type="button" data-v="1" onclick="setRating(1)">1</button>
+        <button type="button" data-v="2" onclick="setRating(2)">2</button>
+        <button type="button" data-v="3" onclick="setRating(3)">3</button>
+        <button type="button" data-v="4" onclick="setRating(4)">4</button>
+        <button type="button" data-v="5" onclick="setRating(5)">5</button>
+      </div>
+      <label>Not (opsiyonel)</label>
+      <input type="text" id="pNote" placeholder="örn. dizde hafif ağrı belirtti">
+      <button class="btn btn-primary" onclick="savePerformance()">Kaydet ve Değerlendir</button>
+    </div>
+
+    <div class="card" id="insightCard" style="display:none;">
+      <h2>Bugünkü Değerlendirme</h2>
+      <div id="insightBody"></div>
+    </div>
+
+    <div class="card">
+      <h2>Geçmiş Kayıtlar</h2>
+      <div id="perfHistory"></div>
+    </div>
+  </section>
+
 </main>
 
 <nav class="bottom">
@@ -494,9 +562,14 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2.5" y="6" width="19" height="13" rx="2"/><path d="M2.5 10h19"/><circle cx="17" cy="14.5" r="1.4" fill="currentColor" stroke="none"/></svg>
     <span class="stripe-dot"></span>Aidat
   </button>
+  <button data-view="performans" onclick="switchView('performans')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l5-5 4 4 8-9"/><path d="M15 7h5v5"/></svg>
+    <span class="stripe-dot"></span>Performans
+  </button>
 </nav>
 
 <div class="toast" id="toast"></div>
+
 
 <script>
 /* ---------------- DEPOLAMA KATMANI ----------------
@@ -608,6 +681,7 @@ async function saveGroup(){
   await persistGroups();
   resetGroupForm();
   renderGroupList();
+  fillPerfAthleteSelect();
   fillGroupSelect();
   renderAthleteList();
 }
@@ -637,6 +711,7 @@ async function deleteGroup(id){
   await persistGroups();
   await persistAthletes();
   renderGroupList();
+  fillPerfAthleteSelect();
   fillGroupSelect();
   renderAthleteList();
   toast('Grup silindi');
@@ -752,6 +827,7 @@ function switchView(name){
   if(name==='sporcular') renderAthleteList();
   if(name==='yoklama') loadAndRenderAttendance();
   if(name==='aidat') loadAndRenderDues();
+  if(name==='performans'){ fillPerfAthleteSelect(); renderPerfHistory(); }
 }
 
 /* ---------------- SPORCULAR ---------------- */
@@ -792,6 +868,7 @@ async function saveAthlete(){
   resetForm();
   renderAthleteList();
   renderGroupList();
+  fillPerfAthleteSelect();
 }
 
 function editAthlete(id){
@@ -822,6 +899,7 @@ async function deleteAthlete(id){
   await persistPayments();
   renderAthleteList();
   renderGroupList();
+  fillPerfAthleteSelect();
   toast('Sporcu silindi');
 }
 
@@ -897,6 +975,7 @@ async function sporcuAyrildi(id){
   await persistAthletes();
   renderAthleteList();
   renderGroupList();
+  fillPerfAthleteSelect();
   toast(`${a.name} ayrılanlara taşındı`);
 }
 
@@ -908,6 +987,7 @@ async function sporcuGeriDondu(id){
   await persistAthletes();
   renderAthleteList();
   renderGroupList();
+  fillPerfAthleteSelect();
   toast(`${a.name} yeniden aktif`);
 }
 
@@ -1716,6 +1796,7 @@ async function restoreBackup(input){
   yoklamaOnbelleginiTemizle();
   fillGroupSelect();
   renderGroupList();
+  fillPerfAthleteSelect();
   renderAthleteList();
   renderOzet();
   toast('Yedek geri yüklendi');
@@ -1741,6 +1822,252 @@ async function renderBackupWarning(){
   }
 }
 
+/* ---------------- PERFORMANS ---------------- */
+/* Kural tabanlı değerlendirme: yapay zeka çağrısı yok, tamamen bu cihazda
+   çalışır. Her metrik için sporcunun kendi geçmiş ortalamasıyla kıyaslar. */
+
+let performance_ = {};   // { 'YYYY-MM-DD': { athleteId: {pace, duration, reps, rating, note} } }
+let seciliRating = null;
+
+async function loadPerformance(){
+  try{
+    const r = await window.storage.get('performance', false);
+    performance_ = r ? JSON.parse(r.value) : {};
+  }catch(e){ performance_ = {}; }
+}
+async function persistPerformance(){
+  await window.storage.set('performance', JSON.stringify(performance_), false);
+}
+
+// "5:20" -> 320 saniye. Geçersizse null.
+function paceToSaniye(metin){
+  if(!metin) return null;
+  const m = metin.trim().match(/^(\d{1,2}):([0-5]?\d)$/);
+  if(!m) return null;
+  return parseInt(m[1])*60 + parseInt(m[2]);
+}
+function saniyeToPace(sn){
+  if(sn == null) return '—';
+  const dk = Math.floor(sn/60), s = Math.round(sn%60);
+  return dk + ':' + String(s).padStart(2,'0');
+}
+
+function fillPerfAthleteSelect(){
+  const sel = document.getElementById('pAthlete');
+  if(!sel) return;
+  const mevcut = sel.value;
+  sel.innerHTML = aktifSporcular()
+    .sort((a,b)=>a.name.localeCompare(b.name,'tr'))
+    .map(a=>`<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('');
+  if(mevcut) sel.value = mevcut;
+}
+
+function setRating(v){
+  seciliRating = (seciliRating === v) ? null : v;
+  document.querySelectorAll('#pRating button').forEach(b=>{
+    b.classList.toggle('on', Number(b.dataset.v) === seciliRating);
+  });
+}
+
+function resetPerfForm(){
+  document.getElementById('pPace').value = '';
+  document.getElementById('pDuration').value = '';
+  document.getElementById('pReps').value = '';
+  document.getElementById('pNote').value = '';
+  seciliRating = null;
+  document.querySelectorAll('#pRating button').forEach(b=>b.classList.remove('on'));
+}
+
+// Bir sporcunun, verilen tarihten ÖNCEKİ en fazla N kaydını, en yeniden eskiye getirir
+function gecmisKayitlar(athleteId, oncekiTarih, n){
+  const tarihler = Object.keys(performance_).filter(d=>d < oncekiTarih).sort().reverse();
+  const out = [];
+  for(const d of tarihler){
+    const k = performance_[d][athleteId];
+    if(k){ out.push({date:d, ...k}); if(out.length >= n) break; }
+  }
+  return out;
+}
+
+function ortalama(dizi){
+  const gecerli = dizi.filter(x=>x != null);
+  if(!gecerli.length) return null;
+  return gecerli.reduce((a,b)=>a+b,0) / gecerli.length;
+}
+
+// Tek bir metrik için kıyaslama: yuksekIyi=true ise büyük değer iyi (tekrar, süre),
+// false ise küçük değer iyi (koşu temposu - saniye).
+function metrikYorumu(ad, bugun, gecmisDizi, yuksekIyi, birim){
+  if(bugun == null) return null;
+  const onceki = ortalama(gecmisDizi);
+  if(onceki == null || gecmisDizi.length < 2){
+    return {tip:'flat', metin:`${ad}: ${bugun}${birim} · kıyaslamak için henüz yeterli geçmiş yok`};
+  }
+  const fark = yuksekIyi ? (bugun - onceki) : (onceki - bugun);
+  const yuzde = Math.abs(fark) / onceki * 100;
+
+  if(yuzde < 4){
+    return {tip:'flat', metin:`${ad}: ${bugun}${birim} · son ortalamayla aynı düzeyde (${onceki.toFixed(1)}${birim})`};
+  }
+  if(fark > 0){
+    return {tip:'up', metin:`${ad}: ${bugun}${birim} · son ortalamaya göre %${yuzde.toFixed(0)} daha iyi (${onceki.toFixed(1)}${birim})`};
+  }
+  return {tip:'down', metin:`${ad}: ${bugun}${birim} · son ortalamaya göre %${yuzde.toFixed(0)} geride (${onceki.toFixed(1)}${birim})`};
+}
+
+function degerlendirmeUret(athleteId, tarih, bugunku){
+  const gecmis = gecmisKayitlar(athleteId, tarih, 5);
+  const sonuclar = [];
+
+  if(bugunku.pace != null){
+    sonuclar.push(metrikYorumu('Koşu temposu', bugunku.pace, gecmis.map(g=>g.pace), false, ' sn/km' ));
+  }
+  if(bugunku.duration != null){
+    sonuclar.push(metrikYorumu('Dayanıklılık', bugunku.duration, gecmis.map(g=>g.duration), true, ' dk'));
+  }
+  if(bugunku.reps != null){
+    sonuclar.push(metrikYorumu('Teknik tekrar', bugunku.reps, gecmis.map(g=>g.reps), true, ' tekrar'));
+  }
+  const gecerliSonuclar = sonuclar.filter(Boolean);
+
+  // Öneriler
+  const oneriler = [];
+  const dusenler = gecerliSonuclar.filter(s=>s.tip==='down');
+  const yukselenler = gecerliSonuclar.filter(s=>s.tip==='up');
+
+  if(dusenler.length >= 2){
+    oneriler.push('Birden fazla metrikte düşüş var. Yorgunluk birikmiş olabilir — bir sonraki antrenmanı hafif tut ya da ekstra dinlenme günü ver.');
+  }else if(dusenler.length === 1){
+    oneriler.push('Bir metrikte gerileme var, tek antrenmanlık bir dalgalanma olabilir. Önümüzdeki kayıtla birlikte değerlendir.');
+  }
+
+  if(yukselenler.length >= 2){
+    oneriler.push('Birden fazla metrikte belirgin iyileşme var. Yükü kademeli olarak artırmayı düşünebilirsin.');
+  }
+
+  // Platonun tespiti: pace icin son 3 kayit + bugun neredeyse ayni mi
+  if(bugunku.pace != null){
+    const sonPace = [bugunku.pace, ...gecmis.slice(0,3).map(g=>g.pace)].filter(x=>x!=null);
+    if(sonPace.length >= 4){
+      const ort = ortalama(sonPace);
+      const sapmalar = sonPace.map(x=>Math.abs(x-ort)/ort*100);
+      if(Math.max(...sapmalar) < 3){
+        oneriler.push('Koşu temposu son 4 antrenmandır neredeyse hiç değişmiyor. Sabitlenme olabilir — mesafeyi ya da interval yapısını değiştirmeyi dene.');
+      }
+    }
+  }
+
+  // Puan trendi
+  if(bugunku.rating != null){
+    const sonPuanlar = gecmis.slice(0,3).map(g=>g.rating).filter(x=>x!=null);
+    if(bugunku.rating <= 2 && sonPuanlar.filter(p=>p<=2).length >= 1){
+      oneriler.push('Genel performans puanı üst üste düşük. Sporcuyla kısa bir konuşma faydalı olabilir — yorgunluk, motivasyon ya da başka bir sebep olabilir.');
+    }
+  }
+
+  if(gecmis.length === 0){
+    oneriler.unshift('Bu sporcu için ilk kayıt. Birkaç antrenman sonra kıyaslamalar ve öneriler anlamlı olmaya başlayacak.');
+  }
+
+  let ozet;
+  if(gecerliSonuclar.length === 0){
+    ozet = 'Sayısal bir metrik girilmedi, sadece genel not kaydedildi.';
+  }else if(yukselenler.length > dusenler.length){
+    ozet = 'Bugün genel olarak son ortalamanın üzerinde bir performans.';
+  }else if(dusenler.length > yukselenler.length){
+    ozet = 'Bugün genel olarak son ortalamanın altında bir performans.';
+  }else{
+    ozet = 'Bugünkü performans son ortalamaya yakın, istikrarlı.';
+  }
+
+  return {ozet, metrikler: gecerliSonuclar, oneriler};
+}
+
+async function savePerformance(){
+  const athleteId = document.getElementById('pAthlete').value;
+  if(!athleteId){ toast('Önce sporcu ekle'); return; }
+  const tarih = document.getElementById('pDate').value || todayStr();
+
+  const paceStr = document.getElementById('pPace').value.trim();
+  const pace = paceStr ? paceToSaniye(paceStr) : null;
+  if(paceStr && pace == null){ toast('Tempo biçimi hatalı, örn. 5:20 gibi yaz'); return; }
+
+  const duration = document.getElementById('pDuration').value ? Number(document.getElementById('pDuration').value) : null;
+  const reps = document.getElementById('pReps').value ? Number(document.getElementById('pReps').value) : null;
+  const note = document.getElementById('pNote').value.trim();
+  const rating = seciliRating;
+
+  if(pace==null && duration==null && reps==null && rating==null && !note){
+    toast('En az bir alan doldurmalısın');
+    return;
+  }
+
+  const kayit = {pace, duration, reps, rating, note};
+  if(!performance_[tarih]) performance_[tarih] = {};
+  performance_[tarih][athleteId] = kayit;
+  await persistPerformance();
+
+  const sonuc = degerlendirmeUret(athleteId, tarih, kayit);
+  renderInsight(sonuc);
+  renderPerfHistory();
+  resetPerfForm();
+  toast('Kayıt alındı');
+}
+
+function trendIkon(tip){
+  if(tip==='up') return '<svg class="insight-icon trend-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 18l6-6 4 4 8-9"/></svg>';
+  if(tip==='down') return '<svg class="insight-icon trend-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 6l6 6 4-4 8 9"/></svg>';
+  return '<svg class="insight-icon trend-flat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12h16"/></svg>';
+}
+
+function renderInsight(sonuc){
+  const card = document.getElementById('insightCard');
+  const wrap = document.getElementById('insightBody');
+  card.style.display = '';
+  let html = `<div class="insight-verdict">${sonuc.ozet}</div>`;
+  html += sonuc.metrikler.map(m=>`<div class="insight-item">${trendIkon(m.tip)}<span>${m.metin}</span></div>`).join('');
+  if(sonuc.oneriler.length){
+    html += `<div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--line);">`;
+    html += sonuc.oneriler.map(o=>`<div class="insight-item"><svg class="insight-icon" viewBox="0 0 24 24" fill="none" stroke="#B08A2E" stroke-width="2"><path d="M9 18h6M10 22h4M12 2a6 6 0 0 0-4 10.5c.6.6 1 1.4 1 2.5h6c0-1.1.4-1.9 1-2.5A6 6 0 0 0 12 2Z"/></svg><span>${o}</span></div>`).join('');
+    html += `</div>`;
+  }
+  wrap.innerHTML = html;
+  card.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+function renderPerfHistory(){
+  const wrap = document.getElementById('perfHistory');
+  if(!wrap) return;
+  const athleteId = document.getElementById('pAthlete').value;
+  if(!athleteId){ wrap.innerHTML = `<div class="empty">Önce sporcu ekle.</div>`; return; }
+
+  const kayitlar = [];
+  for(const [tarih, gunKayitlari] of Object.entries(performance_)){
+    if(gunKayitlari[athleteId]) kayitlar.push({tarih, ...gunKayitlari[athleteId]});
+  }
+  if(!kayitlar.length){
+    wrap.innerHTML = `<div class="empty">Bu sporcu için henüz kayıt yok.</div>`;
+    return;
+  }
+  kayitlar.sort((a,b)=>b.tarih.localeCompare(a.tarih));
+
+  wrap.innerHTML = kayitlar.slice(0,20).map(k=>{
+    const metrikler = [];
+    if(k.pace!=null) metrikler.push('tempo ' + saniyeToPace(k.pace));
+    if(k.duration!=null) metrikler.push(k.duration+' dk');
+    if(k.reps!=null) metrikler.push(k.reps+' tekrar');
+    if(k.rating!=null) metrikler.push('puan ' + k.rating + '/5');
+    return `
+    <div class="perf-row">
+      <div class="perf-top">
+        <span style="font-family:var(--font-mono); font-size:12.5px; color:var(--ink-soft);">${k.tarih}</span>
+      </div>
+      ${metrikler.length ? `<div class="perf-metrics">${metrikler.join(' · ')}</div>` : ''}
+      ${k.note ? `<div class="perf-note">"${escapeHtml(k.note)}"</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
 /* ---------------- init ---------------- */
 async function init(){
   const d = new Date();
@@ -1748,8 +2075,13 @@ async function init(){
   await loadGroups();
   await loadAthletes();
   await loadPayments();
+  await loadPerformance();
+  fillPerfAthleteSelect();
+  const pDateEl = document.getElementById('pDate');
+  if(pDateEl) pDateEl.value = todayStr();
   fillGroupSelect();
   renderGroupList();
+  fillPerfAthleteSelect();
 
   // Tarih değişince o güne ait seansları yeniden göster
   const dateInput = document.getElementById('attDate');
