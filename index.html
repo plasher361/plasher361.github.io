@@ -255,6 +255,19 @@
     font-family:var(--font-display); font-size:18px; font-weight:600; color:var(--ink-soft);
   }
   .rating-picker button.on{background:var(--navy); color:#fff; border-color:var(--navy);}
+  .perf-subhead{font-size:11.5px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.04em; margin:20px 0 8px;}
+  .perf-subhead:first-of-type{margin-top:14px;}
+  .perf-subhead .hint{display:block; font-size:11px; font-weight:400; color:var(--ink-soft); text-transform:none; letter-spacing:0; margin-top:2px;}
+  .type-picker{display:flex; gap:8px;}
+  .type-picker button{
+    flex:1; padding:11px 0; border-radius:10px; background:#F7FAFD; border:1px solid var(--line);
+    font-family:var(--font-display); font-size:13.5px; font-weight:600; color:var(--ink-soft);
+  }
+  .type-picker button.on{background:var(--navy); color:#fff; border-color:var(--navy);}
+  .type-picker button.on[data-v="mac"]{background:var(--red); border-color:var(--red);}
+  .perf-badge{display:inline-block; font-size:10px; font-weight:700; padding:2px 7px; border-radius:6px; margin-left:7px; vertical-align:1px;}
+  .perf-badge.mac{background:var(--red-soft); color:var(--red);}
+  .perf-badge.antrenman{background:var(--navy-soft); color:var(--navy);}
   .insight-verdict{
     font-size:15px; font-weight:600; margin:0 0 10px; line-height:1.5;
   }
@@ -507,6 +520,14 @@
       <select id="pAthlete" onchange="renderPerfHistory()"></select>
       <label>Tarih</label>
       <input type="date" id="pDate">
+
+      <label>Kayıt tipi</label>
+      <div class="type-picker" id="pSessionType">
+        <button type="button" data-v="antrenman" onclick="setSessionType('antrenman')">Antrenman</button>
+        <button type="button" data-v="mac" onclick="setSessionType('mac')">Maç / Sparring</button>
+      </div>
+
+      <div class="perf-subhead">Fiziksel<span class="hint">Kondisyon ve hız ölçümleri</span></div>
       <div class="row2">
         <div>
           <label>Koşu temposu (dk:sn / km)</label>
@@ -517,15 +538,85 @@
           <input type="number" id="pDuration" placeholder="örn. 25" inputmode="numeric">
         </div>
       </div>
-      <label>Teknik tekrar sayısı</label>
-      <input type="number" id="pReps" placeholder="örn. 40" inputmode="numeric">
+      <div class="row2">
+        <div>
+          <label>10m sprint (saniye)</label>
+          <input type="text" id="pSprint" placeholder="örn. 1.9" inputmode="decimal">
+        </div>
+        <div>
+          <label>Reaksiyon süresi (saniye)</label>
+          <input type="text" id="pReaction" placeholder="örn. 0.25" inputmode="decimal">
+        </div>
+      </div>
+      <div class="row2">
+        <div>
+          <label>Vücut ağırlığı (kg)</label>
+          <input type="text" id="pWeight" placeholder="örn. 58.5" inputmode="decimal">
+        </div>
+        <div>
+          <label>Teknik tekrar sayısı</label>
+          <input type="number" id="pReps" placeholder="örn. 40" inputmode="numeric">
+        </div>
+      </div>
+
+      <div class="perf-subhead">Kumite Metrikleri<span class="hint">Her biri 1-5, doldurman gerekmiyor</span></div>
+      <label>Mesafe kontrolü (maai)</label>
+      <div class="rating-picker" id="pKumiteDistance">
+        <button type="button" data-v="1" onclick="setRating('kumiteDistance','pKumiteDistance',1)">1</button>
+        <button type="button" data-v="2" onclick="setRating('kumiteDistance','pKumiteDistance',2)">2</button>
+        <button type="button" data-v="3" onclick="setRating('kumiteDistance','pKumiteDistance',3)">3</button>
+        <button type="button" data-v="4" onclick="setRating('kumiteDistance','pKumiteDistance',4)">4</button>
+        <button type="button" data-v="5" onclick="setRating('kumiteDistance','pKumiteDistance',5)">5</button>
+      </div>
+      <label>Tempo / zamanlama</label>
+      <div class="rating-picker" id="pKumiteTiming">
+        <button type="button" data-v="1" onclick="setRating('kumiteTiming','pKumiteTiming',1)">1</button>
+        <button type="button" data-v="2" onclick="setRating('kumiteTiming','pKumiteTiming',2)">2</button>
+        <button type="button" data-v="3" onclick="setRating('kumiteTiming','pKumiteTiming',3)">3</button>
+        <button type="button" data-v="4" onclick="setRating('kumiteTiming','pKumiteTiming',4)">4</button>
+        <button type="button" data-v="5" onclick="setRating('kumiteTiming','pKumiteTiming',5)">5</button>
+      </div>
+      <label>Taktik karar verme</label>
+      <div class="rating-picker" id="pKumiteTactic">
+        <button type="button" data-v="1" onclick="setRating('kumiteTactic','pKumiteTactic',1)">1</button>
+        <button type="button" data-v="2" onclick="setRating('kumiteTactic','pKumiteTactic',2)">2</button>
+        <button type="button" data-v="3" onclick="setRating('kumiteTactic','pKumiteTactic',3)">3</button>
+        <button type="button" data-v="4" onclick="setRating('kumiteTactic','pKumiteTactic',4)">4</button>
+        <button type="button" data-v="5" onclick="setRating('kumiteTactic','pKumiteTactic',5)">5</button>
+      </div>
+      <label>Savunma etkinliği</label>
+      <div class="rating-picker" id="pKumiteDefense">
+        <button type="button" data-v="1" onclick="setRating('kumiteDefense','pKumiteDefense',1)">1</button>
+        <button type="button" data-v="2" onclick="setRating('kumiteDefense','pKumiteDefense',2)">2</button>
+        <button type="button" data-v="3" onclick="setRating('kumiteDefense','pKumiteDefense',3)">3</button>
+        <button type="button" data-v="4" onclick="setRating('kumiteDefense','pKumiteDefense',4)">4</button>
+        <button type="button" data-v="5" onclick="setRating('kumiteDefense','pKumiteDefense',5)">5</button>
+      </div>
+      <label>Skor alma etkinliği</label>
+      <div class="rating-picker" id="pKumiteScoring">
+        <button type="button" data-v="1" onclick="setRating('kumiteScoring','pKumiteScoring',1)">1</button>
+        <button type="button" data-v="2" onclick="setRating('kumiteScoring','pKumiteScoring',2)">2</button>
+        <button type="button" data-v="3" onclick="setRating('kumiteScoring','pKumiteScoring',3)">3</button>
+        <button type="button" data-v="4" onclick="setRating('kumiteScoring','pKumiteScoring',4)">4</button>
+        <button type="button" data-v="5" onclick="setRating('kumiteScoring','pKumiteScoring',5)">5</button>
+      </div>
+
+      <div class="perf-subhead">Genel</div>
+      <label>Toparlanma seviyesi</label>
+      <div class="rating-picker" id="pRecovery">
+        <button type="button" data-v="1" onclick="setRating('recovery','pRecovery',1)">1</button>
+        <button type="button" data-v="2" onclick="setRating('recovery','pRecovery',2)">2</button>
+        <button type="button" data-v="3" onclick="setRating('recovery','pRecovery',3)">3</button>
+        <button type="button" data-v="4" onclick="setRating('recovery','pRecovery',4)">4</button>
+        <button type="button" data-v="5" onclick="setRating('recovery','pRecovery',5)">5</button>
+      </div>
       <label>Genel performans</label>
       <div class="rating-picker" id="pRating">
-        <button type="button" data-v="1" onclick="setRating(1)">1</button>
-        <button type="button" data-v="2" onclick="setRating(2)">2</button>
-        <button type="button" data-v="3" onclick="setRating(3)">3</button>
-        <button type="button" data-v="4" onclick="setRating(4)">4</button>
-        <button type="button" data-v="5" onclick="setRating(5)">5</button>
+        <button type="button" data-v="1" onclick="setRating('rating','pRating',1)">1</button>
+        <button type="button" data-v="2" onclick="setRating('rating','pRating',2)">2</button>
+        <button type="button" data-v="3" onclick="setRating('rating','pRating',3)">3</button>
+        <button type="button" data-v="4" onclick="setRating('rating','pRating',4)">4</button>
+        <button type="button" data-v="5" onclick="setRating('rating','pRating',5)">5</button>
       </div>
       <label>Not (opsiyonel)</label>
       <input type="text" id="pNote" placeholder="örn. dizde hafif ağrı belirtti">
@@ -1826,8 +1917,9 @@ async function renderBackupWarning(){
 /* Kural tabanlı değerlendirme: yapay zeka çağrısı yok, tamamen bu cihazda
    çalışır. Her metrik için sporcunun kendi geçmiş ortalamasıyla kıyaslar. */
 
-let performance_ = {};   // { 'YYYY-MM-DD': { athleteId: {pace, duration, reps, rating, note} } }
-let seciliRating = null;
+let performance_ = {};   // { 'YYYY-MM-DD': { athleteId: {pace, duration, reps, rating, note, ...kumite} } }
+let seciliRatingler = {rating:null, recovery:null, kumiteDistance:null, kumiteTiming:null, kumiteTactic:null, kumiteDefense:null, kumiteScoring:null};
+let seciliSessionType = 'antrenman';
 
 async function loadPerformance(){
   try{
@@ -1852,6 +1944,17 @@ function saniyeToPace(sn){
   return dk + ':' + String(s).padStart(2,'0');
 }
 
+// "1,9" ya da "1.9" -> 1.9. Boşsa/hatalıysa null.
+function ondalikParse(metin){
+  if(!metin) return null;
+  const temiz = metin.trim().replace(',', '.');
+  if(!/^\d+(\.\d+)?$/.test(temiz)) return null;
+  const n = Number(temiz);
+  return isNaN(n) ? null : n;
+}
+
+const SESSION_TYPE_LABEL = {antrenman:'Antrenman', mac:'Maç / Sparring'};
+
 function fillPerfAthleteSelect(){
   const sel = document.getElementById('pAthlete');
   if(!sel) return;
@@ -1862,29 +1965,44 @@ function fillPerfAthleteSelect(){
   if(mevcut) sel.value = mevcut;
 }
 
-function setRating(v){
-  seciliRating = (seciliRating === v) ? null : v;
-  document.querySelectorAll('#pRating button').forEach(b=>{
-    b.classList.toggle('on', Number(b.dataset.v) === seciliRating);
+function setRating(field, containerId, v){
+  seciliRatingler[field] = (seciliRatingler[field] === v) ? null : v;
+  document.querySelectorAll('#'+containerId+' button').forEach(b=>{
+    b.classList.toggle('on', Number(b.dataset.v) === seciliRatingler[field]);
+  });
+}
+
+function setSessionType(v){
+  seciliSessionType = v;
+  document.querySelectorAll('#pSessionType button').forEach(b=>{
+    b.classList.toggle('on', b.dataset.v === v);
   });
 }
 
 function resetPerfForm(){
   document.getElementById('pPace').value = '';
   document.getElementById('pDuration').value = '';
+  document.getElementById('pSprint').value = '';
+  document.getElementById('pReaction').value = '';
+  document.getElementById('pWeight').value = '';
   document.getElementById('pReps').value = '';
   document.getElementById('pNote').value = '';
-  seciliRating = null;
-  document.querySelectorAll('#pRating button').forEach(b=>b.classList.remove('on'));
+  seciliRatingler = {rating:null, recovery:null, kumiteDistance:null, kumiteTiming:null, kumiteTactic:null, kumiteDefense:null, kumiteScoring:null};
+  document.querySelectorAll('.rating-picker button').forEach(b=>b.classList.remove('on'));
+  setSessionType('antrenman');
 }
 
-// Bir sporcunun, verilen tarihten ÖNCEKİ en fazla N kaydını, en yeniden eskiye getirir
-function gecmisKayitlar(athleteId, oncekiTarih, n){
+// Bir sporcunun, verilen tarihten ÖNCEKİ en fazla N kaydını, en yeniden eskiye getirir.
+// sessionType verilirse sadece aynı tipteki kayıtlar (antrenman/maç) döner —
+// maç performansı ancak geçmiş maçlarla, antrenman ancak geçmiş antrenmanla anlamlı kıyaslanır.
+function gecmisKayitlar(athleteId, oncekiTarih, n, sessionType){
   const tarihler = Object.keys(performance_).filter(d=>d < oncekiTarih).sort().reverse();
   const out = [];
   for(const d of tarihler){
     const k = performance_[d][athleteId];
-    if(k){ out.push({date:d, ...k}); if(out.length >= n) break; }
+    if(!k) continue;
+    if(sessionType && (k.sessionType || 'antrenman') !== sessionType) continue;
+    out.push({date:d, ...k}); if(out.length >= n) break;
   }
   return out;
 }
@@ -1916,18 +2034,61 @@ function metrikYorumu(ad, bugun, gecmisDizi, yuksekIyi, birim){
 }
 
 function degerlendirmeUret(athleteId, tarih, bugunku){
-  const gecmis = gecmisKayitlar(athleteId, tarih, 5);
+  const tip = bugunku.sessionType || 'antrenman';
+  // Kumite alt puanları maç/antrenman ayrımıyla kıyaslanır; genel fiziksel
+  // metrikler (tempo, dayanıklılık, sprint, reaksiyon) her iki tipte de anlamlı
+  // olduğu için tüm geçmişle kıyaslanır.
+  const gecmisTumu = gecmisKayitlar(athleteId, tarih, 5);
+  const gecmisAyniTip = gecmisKayitlar(athleteId, tarih, 5, tip);
+
   const sonuclar = [];
 
   if(bugunku.pace != null){
-    sonuclar.push(metrikYorumu('Koşu temposu', bugunku.pace, gecmis.map(g=>g.pace), false, ' sn/km' ));
+    sonuclar.push(metrikYorumu('Koşu temposu', bugunku.pace, gecmisTumu.map(g=>g.pace), false, ' sn/km' ));
   }
   if(bugunku.duration != null){
-    sonuclar.push(metrikYorumu('Dayanıklılık', bugunku.duration, gecmis.map(g=>g.duration), true, ' dk'));
+    sonuclar.push(metrikYorumu('Dayanıklılık', bugunku.duration, gecmisTumu.map(g=>g.duration), true, ' dk'));
+  }
+  if(bugunku.sprint != null){
+    sonuclar.push(metrikYorumu('10m sprint', bugunku.sprint, gecmisTumu.map(g=>g.sprint), false, ' sn'));
+  }
+  if(bugunku.reaction != null){
+    sonuclar.push(metrikYorumu('Reaksiyon süresi', bugunku.reaction, gecmisTumu.map(g=>g.reaction), false, ' sn'));
   }
   if(bugunku.reps != null){
-    sonuclar.push(metrikYorumu('Teknik tekrar', bugunku.reps, gecmis.map(g=>g.reps), true, ' tekrar'));
+    sonuclar.push(metrikYorumu('Teknik tekrar', bugunku.reps, gecmisTumu.map(g=>g.reps), true, ' tekrar'));
   }
+  if(bugunku.kumiteDistance != null){
+    sonuclar.push(metrikYorumu('Mesafe kontrolü', bugunku.kumiteDistance, gecmisAyniTip.map(g=>g.kumiteDistance), true, '/5'));
+  }
+  if(bugunku.kumiteTiming != null){
+    sonuclar.push(metrikYorumu('Tempo / zamanlama', bugunku.kumiteTiming, gecmisAyniTip.map(g=>g.kumiteTiming), true, '/5'));
+  }
+  if(bugunku.kumiteTactic != null){
+    sonuclar.push(metrikYorumu('Taktik karar verme', bugunku.kumiteTactic, gecmisAyniTip.map(g=>g.kumiteTactic), true, '/5'));
+  }
+  if(bugunku.kumiteDefense != null){
+    sonuclar.push(metrikYorumu('Savunma etkinliği', bugunku.kumiteDefense, gecmisAyniTip.map(g=>g.kumiteDefense), true, '/5'));
+  }
+  if(bugunku.kumiteScoring != null){
+    sonuclar.push(metrikYorumu('Skor alma etkinliği', bugunku.kumiteScoring, gecmisAyniTip.map(g=>g.kumiteScoring), true, '/5'));
+  }
+  if(bugunku.recovery != null){
+    sonuclar.push(metrikYorumu('Toparlanma', bugunku.recovery, gecmisTumu.map(g=>g.recovery), true, '/5'));
+  }
+
+  // Vücut ağırlığı: iyi/kötü değil, sadece değişimi nötr şekilde bildir
+  if(bugunku.weight != null){
+    const oncekiKilo = gecmisTumu.map(g=>g.weight).filter(x=>x!=null)[0];
+    if(oncekiKilo != null){
+      const fark = bugunku.weight - oncekiKilo;
+      const yon = fark === 0 ? 'değişmedi' : (fark > 0 ? `+${fark.toFixed(1)}kg` : `${fark.toFixed(1)}kg`);
+      sonuclar.push({tip:'flat', metin:`Vücut ağırlığı: ${bugunku.weight}kg · önceki kayda göre ${yon}`});
+    }else{
+      sonuclar.push({tip:'flat', metin:`Vücut ağırlığı: ${bugunku.weight}kg · kıyaslamak için henüz yeterli geçmiş yok`});
+    }
+  }
+
   const gecerliSonuclar = sonuclar.filter(Boolean);
 
   // Öneriler
@@ -1935,7 +2096,9 @@ function degerlendirmeUret(athleteId, tarih, bugunku){
   const dusenler = gecerliSonuclar.filter(s=>s.tip==='down');
   const yukselenler = gecerliSonuclar.filter(s=>s.tip==='up');
 
-  if(dusenler.length >= 2){
+  if(bugunku.recovery != null && bugunku.recovery <= 2){
+    oneriler.push('Toparlanma seviyesi düşük bildirildi. Diğer metrikler iyi görünse bile yükü bir sonraki antrenmanda hafif tutmayı düşün.');
+  }else if(dusenler.length >= 2){
     oneriler.push('Birden fazla metrikte düşüş var. Yorgunluk birikmiş olabilir — bir sonraki antrenmanı hafif tut ya da ekstra dinlenme günü ver.');
   }else if(dusenler.length === 1){
     oneriler.push('Bir metrikte gerileme var, tek antrenmanlık bir dalgalanma olabilir. Önümüzdeki kayıtla birlikte değerlendir.');
@@ -1945,9 +2108,9 @@ function degerlendirmeUret(athleteId, tarih, bugunku){
     oneriler.push('Birden fazla metrikte belirgin iyileşme var. Yükü kademeli olarak artırmayı düşünebilirsin.');
   }
 
-  // Platonun tespiti: pace icin son 3 kayit + bugun neredeyse ayni mi
+  // Plato tespiti: pace icin son 3 kayit + bugun neredeyse ayni mi
   if(bugunku.pace != null){
-    const sonPace = [bugunku.pace, ...gecmis.slice(0,3).map(g=>g.pace)].filter(x=>x!=null);
+    const sonPace = [bugunku.pace, ...gecmisTumu.slice(0,3).map(g=>g.pace)].filter(x=>x!=null);
     if(sonPace.length >= 4){
       const ort = ortalama(sonPace);
       const sapmalar = sonPace.map(x=>Math.abs(x-ort)/ort*100);
@@ -1957,25 +2120,50 @@ function degerlendirmeUret(athleteId, tarih, bugunku){
     }
   }
 
+  // Kumite ortalama puanı plato tespiti (son 3 kayıt + bugün, aynı tipte)
+  const kumiteAlanlari = ['kumiteDistance','kumiteTiming','kumiteTactic','kumiteDefense','kumiteScoring'];
+  const bugunKumiteOrt = ortalama(kumiteAlanlari.map(a=>bugunku[a]));
+  if(bugunKumiteOrt != null){
+    const gecmisKumiteOrt = gecmisAyniTip.slice(0,3).map(g=>ortalama(kumiteAlanlari.map(a=>g[a]))).filter(x=>x!=null);
+    const sonKumite = [bugunKumiteOrt, ...gecmisKumiteOrt];
+    if(sonKumite.length >= 4){
+      const ort = ortalama(sonKumite);
+      const sapmalar = sonKumite.map(x=>Math.abs(x-ort)/ort*100);
+      if(Math.max(...sapmalar) < 4){
+        oneriler.push(`Kumite metrikleri son 4 ${tip==='mac'?'maçtır':'antrenmandır'} neredeyse aynı seviyede. Sabitlenme olabilir — yeni bir taktik senaryo ya da farklı rakip profiliyle çalışmayı dene.`);
+      }
+    }
+  }
+
+  // Skor alma etkinliği düşükse özellikle vurgula (kumite odaklı en kritik metrik)
+  if(bugunku.kumiteScoring != null){
+    const sonScoring = gecmisAyniTip.slice(0,3).map(g=>g.kumiteScoring).filter(x=>x!=null);
+    if(bugunku.kumiteScoring <= 2 && sonScoring.filter(p=>p<=2).length >= 1){
+      oneriler.push('Skor alma etkinliği üst üste düşük. Girişim sayısını mı yoksa isabet oranını mı artırması gerektiğini birlikte değerlendirin.');
+    }
+  }
+
   // Puan trendi
   if(bugunku.rating != null){
-    const sonPuanlar = gecmis.slice(0,3).map(g=>g.rating).filter(x=>x!=null);
+    const sonPuanlar = gecmisTumu.slice(0,3).map(g=>g.rating).filter(x=>x!=null);
     if(bugunku.rating <= 2 && sonPuanlar.filter(p=>p<=2).length >= 1){
       oneriler.push('Genel performans puanı üst üste düşük. Sporcuyla kısa bir konuşma faydalı olabilir — yorgunluk, motivasyon ya da başka bir sebep olabilir.');
     }
   }
 
-  if(gecmis.length === 0){
+  if(gecmisTumu.length === 0){
     oneriler.unshift('Bu sporcu için ilk kayıt. Birkaç antrenman sonra kıyaslamalar ve öneriler anlamlı olmaya başlayacak.');
+  }else if(tip==='mac' && gecmisAyniTip.length === 0){
+    oneriler.unshift('Bu sporcu için ilk maç kaydı. Kumite metrikleri bundan sonraki maçlarla kıyaslanacak.');
   }
 
   let ozet;
   if(gecerliSonuclar.length === 0){
     ozet = 'Sayısal bir metrik girilmedi, sadece genel not kaydedildi.';
   }else if(yukselenler.length > dusenler.length){
-    ozet = 'Bugün genel olarak son ortalamanın üzerinde bir performans.';
+    ozet = tip==='mac' ? 'Bu maçta genel olarak son ortalamanın üzerinde bir performans.' : 'Bugün genel olarak son ortalamanın üzerinde bir performans.';
   }else if(dusenler.length > yukselenler.length){
-    ozet = 'Bugün genel olarak son ortalamanın altında bir performans.';
+    ozet = tip==='mac' ? 'Bu maçta genel olarak son ortalamanın altında bir performans.' : 'Bugün genel olarak son ortalamanın altında bir performans.';
   }else{
     ozet = 'Bugünkü performans son ortalamaya yakın, istikrarlı.';
   }
@@ -1992,17 +2180,39 @@ async function savePerformance(){
   const pace = paceStr ? paceToSaniye(paceStr) : null;
   if(paceStr && pace == null){ toast('Tempo biçimi hatalı, örn. 5:20 gibi yaz'); return; }
 
+  const sprintStr = document.getElementById('pSprint').value.trim();
+  const sprint = sprintStr ? ondalikParse(sprintStr) : null;
+  if(sprintStr && sprint == null){ toast('Sprint süresi hatalı, örn. 1.9 gibi yaz'); return; }
+
+  const reactionStr = document.getElementById('pReaction').value.trim();
+  const reaction = reactionStr ? ondalikParse(reactionStr) : null;
+  if(reactionStr && reaction == null){ toast('Reaksiyon süresi hatalı, örn. 0.25 gibi yaz'); return; }
+
+  const weightStr = document.getElementById('pWeight').value.trim();
+  const weight = weightStr ? ondalikParse(weightStr) : null;
+  if(weightStr && weight == null){ toast('Vücut ağırlığı hatalı, örn. 58.5 gibi yaz'); return; }
+
   const duration = document.getElementById('pDuration').value ? Number(document.getElementById('pDuration').value) : null;
   const reps = document.getElementById('pReps').value ? Number(document.getElementById('pReps').value) : null;
   const note = document.getElementById('pNote').value.trim();
-  const rating = seciliRating;
+  const rating = seciliRatingler.rating;
+  const recovery = seciliRatingler.recovery;
+  const kumiteDistance = seciliRatingler.kumiteDistance;
+  const kumiteTiming = seciliRatingler.kumiteTiming;
+  const kumiteTactic = seciliRatingler.kumiteTactic;
+  const kumiteDefense = seciliRatingler.kumiteDefense;
+  const kumiteScoring = seciliRatingler.kumiteScoring;
+  const sessionType = seciliSessionType;
 
-  if(pace==null && duration==null && reps==null && rating==null && !note){
+  const doluMu = [pace, duration, sprint, reaction, weight, reps, rating, recovery,
+    kumiteDistance, kumiteTiming, kumiteTactic, kumiteDefense, kumiteScoring].some(x=>x!=null) || !!note;
+  if(!doluMu){
     toast('En az bir alan doldurmalısın');
     return;
   }
 
-  const kayit = {pace, duration, reps, rating, note};
+  const kayit = {pace, duration, sprint, reaction, weight, reps, rating, note, sessionType,
+    recovery, kumiteDistance, kumiteTiming, kumiteTactic, kumiteDefense, kumiteScoring};
   if(!performance_[tarih]) performance_[tarih] = {};
   performance_[tarih][athleteId] = kayit;
   await persistPerformance();
@@ -2052,15 +2262,26 @@ function renderPerfHistory(){
   kayitlar.sort((a,b)=>b.tarih.localeCompare(a.tarih));
 
   wrap.innerHTML = kayitlar.slice(0,20).map(k=>{
+    const tip = k.sessionType || 'antrenman';
     const metrikler = [];
     if(k.pace!=null) metrikler.push('tempo ' + saniyeToPace(k.pace));
     if(k.duration!=null) metrikler.push(k.duration+' dk');
+    if(k.sprint!=null) metrikler.push('sprint ' + k.sprint + 's');
+    if(k.reaction!=null) metrikler.push('reaksiyon ' + k.reaction + 's');
+    if(k.weight!=null) metrikler.push(k.weight+' kg');
     if(k.reps!=null) metrikler.push(k.reps+' tekrar');
-    if(k.rating!=null) metrikler.push('puan ' + k.rating + '/5');
+    if(k.kumiteDistance!=null) metrikler.push('mesafe ' + k.kumiteDistance + '/5');
+    if(k.kumiteTiming!=null) metrikler.push('tempo(k) ' + k.kumiteTiming + '/5');
+    if(k.kumiteTactic!=null) metrikler.push('taktik ' + k.kumiteTactic + '/5');
+    if(k.kumiteDefense!=null) metrikler.push('savunma ' + k.kumiteDefense + '/5');
+    if(k.kumiteScoring!=null) metrikler.push('skor ' + k.kumiteScoring + '/5');
+    if(k.recovery!=null) metrikler.push('toparlanma ' + k.recovery + '/5');
+    if(k.rating!=null) metrikler.push('genel ' + k.rating + '/5');
     return `
     <div class="perf-row">
       <div class="perf-top">
         <span style="font-family:var(--font-mono); font-size:12.5px; color:var(--ink-soft);">${k.tarih}</span>
+        <span class="perf-badge ${tip}">${SESSION_TYPE_LABEL[tip]}</span>
       </div>
       ${metrikler.length ? `<div class="perf-metrics">${metrikler.join(' · ')}</div>` : ''}
       ${k.note ? `<div class="perf-note">"${escapeHtml(k.note)}"</div>` : ''}
@@ -2079,6 +2300,7 @@ async function init(){
   fillPerfAthleteSelect();
   const pDateEl = document.getElementById('pDate');
   if(pDateEl) pDateEl.value = todayStr();
+  if(document.getElementById('pSessionType')) setSessionType('antrenman');
   fillGroupSelect();
   renderGroupList();
   fillPerfAthleteSelect();
