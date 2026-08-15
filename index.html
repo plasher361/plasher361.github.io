@@ -265,9 +265,11 @@
   }
   .type-picker button.on{background:var(--navy); color:#fff; border-color:var(--navy);}
   .type-picker button.on[data-v="mac"]{background:var(--red); border-color:var(--red);}
+  .type-picker button.on[data-v="var"]{background:var(--red); border-color:var(--red);}
   .perf-badge{display:inline-block; font-size:10px; font-weight:700; padding:2px 7px; border-radius:6px; margin-left:7px; vertical-align:1px;}
   .perf-badge.mac{background:var(--red-soft); color:var(--red);}
   .perf-badge.antrenman{background:var(--navy-soft); color:var(--navy);}
+  .perf-badge.injury{background:var(--red-soft); color:var(--red);}
   .insight-verdict{
     font-size:15px; font-weight:600; margin:0 0 10px; line-height:1.5;
   }
@@ -599,6 +601,31 @@
         <button type="button" data-v="3" onclick="setRating('kumiteScoring','pKumiteScoring',3)">3</button>
         <button type="button" data-v="4" onclick="setRating('kumiteScoring','pKumiteScoring',4)">4</button>
         <button type="button" data-v="5" onclick="setRating('kumiteScoring','pKumiteScoring',5)">5</button>
+      </div>
+
+      <div class="perf-subhead">Sporcu Bildirimi<span class="hint">Sporcuya sorup gir — ileride sporcu kendi girecek</span></div>
+      <div class="row2">
+        <div>
+          <label>RPE - algılanan zorluk (1-10)</label>
+          <input type="number" id="pRpe" placeholder="örn. 7" min="1" max="10" inputmode="numeric">
+        </div>
+        <div>
+          <label>Uyku süresi (saat)</label>
+          <input type="text" id="pSleep" placeholder="örn. 7.5" inputmode="decimal">
+        </div>
+      </div>
+      <label>Kas ağrısı</label>
+      <div class="rating-picker" id="pSoreness">
+        <button type="button" data-v="1" onclick="setRating('soreness','pSoreness',1)">1</button>
+        <button type="button" data-v="2" onclick="setRating('soreness','pSoreness',2)">2</button>
+        <button type="button" data-v="3" onclick="setRating('soreness','pSoreness',3)">3</button>
+        <button type="button" data-v="4" onclick="setRating('soreness','pSoreness',4)">4</button>
+        <button type="button" data-v="5" onclick="setRating('soreness','pSoreness',5)">5</button>
+      </div>
+      <label>Ağrı / sakatlık bildiriyor mu</label>
+      <div class="type-picker" id="pInjuryFlag">
+        <button type="button" data-v="yok" onclick="setInjuryFlag('yok')">Yok</button>
+        <button type="button" data-v="var" onclick="setInjuryFlag('var')">Var</button>
       </div>
 
       <div class="perf-subhead">Genel</div>
@@ -1918,8 +1945,9 @@ async function renderBackupWarning(){
    çalışır. Her metrik için sporcunun kendi geçmiş ortalamasıyla kıyaslar. */
 
 let performance_ = {};   // { 'YYYY-MM-DD': { athleteId: {pace, duration, reps, rating, note, ...kumite} } }
-let seciliRatingler = {rating:null, recovery:null, kumiteDistance:null, kumiteTiming:null, kumiteTactic:null, kumiteDefense:null, kumiteScoring:null};
+let seciliRatingler = {rating:null, recovery:null, kumiteDistance:null, kumiteTiming:null, kumiteTactic:null, kumiteDefense:null, kumiteScoring:null, soreness:null};
 let seciliSessionType = 'antrenman';
+let seciliInjuryFlag = 'yok';
 
 async function loadPerformance(){
   try{
@@ -1979,6 +2007,13 @@ function setSessionType(v){
   });
 }
 
+function setInjuryFlag(v){
+  seciliInjuryFlag = v;
+  document.querySelectorAll('#pInjuryFlag button').forEach(b=>{
+    b.classList.toggle('on', b.dataset.v === v);
+  });
+}
+
 function resetPerfForm(){
   document.getElementById('pPace').value = '';
   document.getElementById('pDuration').value = '';
@@ -1986,10 +2021,13 @@ function resetPerfForm(){
   document.getElementById('pReaction').value = '';
   document.getElementById('pWeight').value = '';
   document.getElementById('pReps').value = '';
+  document.getElementById('pRpe').value = '';
+  document.getElementById('pSleep').value = '';
   document.getElementById('pNote').value = '';
-  seciliRatingler = {rating:null, recovery:null, kumiteDistance:null, kumiteTiming:null, kumiteTactic:null, kumiteDefense:null, kumiteScoring:null};
+  seciliRatingler = {rating:null, recovery:null, kumiteDistance:null, kumiteTiming:null, kumiteTactic:null, kumiteDefense:null, kumiteScoring:null, soreness:null};
   document.querySelectorAll('.rating-picker button').forEach(b=>b.classList.remove('on'));
   setSessionType('antrenman');
+  setInjuryFlag('yok');
 }
 
 // Bir sporcunun, verilen tarihten ÖNCEKİ en fazla N kaydını, en yeniden eskiye getirir.
@@ -2076,6 +2114,24 @@ function degerlendirmeUret(athleteId, tarih, bugunku){
   if(bugunku.recovery != null){
     sonuclar.push(metrikYorumu('Toparlanma', bugunku.recovery, gecmisTumu.map(g=>g.recovery), true, '/5'));
   }
+  if(bugunku.sleep != null){
+    sonuclar.push(metrikYorumu('Uyku süresi', bugunku.sleep, gecmisTumu.map(g=>g.sleep), true, ' sa'));
+  }
+  if(bugunku.soreness != null){
+    sonuclar.push(metrikYorumu('Kas ağrısı', bugunku.soreness, gecmisTumu.map(g=>g.soreness), false, '/5'));
+  }
+
+  // RPE: iyi/kötü değil, algılanan zorluk — nötr şekilde bildir
+  if(bugunku.rpe != null){
+    const oncekiRpe = gecmisTumu.map(g=>g.rpe).filter(x=>x!=null)[0];
+    if(oncekiRpe != null){
+      const fark = bugunku.rpe - oncekiRpe;
+      const yon = fark === 0 ? 'aynı' : (fark > 0 ? `+${fark} daha zorlu` : `${fark} daha hafif`);
+      sonuclar.push({tip:'flat', metin:`RPE: ${bugunku.rpe}/10 · önceki kayda göre ${yon}`});
+    }else{
+      sonuclar.push({tip:'flat', metin:`RPE: ${bugunku.rpe}/10 · kıyaslamak için henüz yeterli geçmiş yok`});
+    }
+  }
 
   // Vücut ağırlığı: iyi/kötü değil, sadece değişimi nötr şekilde bildir
   if(bugunku.weight != null){
@@ -2096,6 +2152,10 @@ function degerlendirmeUret(athleteId, tarih, bugunku){
   const dusenler = gecerliSonuclar.filter(s=>s.tip==='down');
   const yukselenler = gecerliSonuclar.filter(s=>s.tip==='up');
 
+  if(bugunku.injuryFlag === 'var'){
+    oneriler.push('Sporcu ağrı/sakatlık bildirdi. Antrenman yükünü buna göre düşür ve gerekirse fizyoterapiste yönlendir.');
+  }
+
   if(bugunku.recovery != null && bugunku.recovery <= 2){
     oneriler.push('Toparlanma seviyesi düşük bildirildi. Diğer metrikler iyi görünse bile yükü bir sonraki antrenmanda hafif tutmayı düşün.');
   }else if(dusenler.length >= 2){
@@ -2106,6 +2166,16 @@ function degerlendirmeUret(athleteId, tarih, bugunku){
 
   if(yukselenler.length >= 2){
     oneriler.push('Birden fazla metrikte belirgin iyileşme var. Yükü kademeli olarak artırmayı düşünebilirsin.');
+  }
+
+  // Aşırı yüklenme kombinasyonu: yüksek RPE + az uyku + yüksek kas ağrısı bir arada
+  const asiriYuklenmeIsaretleri = [
+    bugunku.rpe != null && bugunku.rpe >= 8,
+    bugunku.sleep != null && bugunku.sleep < 6,
+    bugunku.soreness != null && bugunku.soreness >= 4
+  ].filter(Boolean).length;
+  if(asiriYuklenmeIsaretleri >= 2){
+    oneriler.push('Yüksek algılanan zorluk, az uyku ya da yüksek kas ağrısı bir arada görünüyor. Aşırı yüklenme riski — önümüzdeki antrenmanı hafifletmeyi düşün.');
   }
 
   // Plato tespiti: pace icin son 3 kayit + bugun neredeyse ayni mi
@@ -2192,27 +2262,37 @@ async function savePerformance(){
   const weight = weightStr ? ondalikParse(weightStr) : null;
   if(weightStr && weight == null){ toast('Vücut ağırlığı hatalı, örn. 58.5 gibi yaz'); return; }
 
+  const sleepStr = document.getElementById('pSleep').value.trim();
+  const sleep = sleepStr ? ondalikParse(sleepStr) : null;
+  if(sleepStr && sleep == null){ toast('Uyku süresi hatalı, örn. 7.5 gibi yaz'); return; }
+
+  const rpeVal = document.getElementById('pRpe').value;
+  const rpe = rpeVal ? Number(rpeVal) : null;
+  if(rpe != null && (rpe < 1 || rpe > 10)){ toast('RPE 1-10 arasında olmalı'); return; }
+
   const duration = document.getElementById('pDuration').value ? Number(document.getElementById('pDuration').value) : null;
   const reps = document.getElementById('pReps').value ? Number(document.getElementById('pReps').value) : null;
   const note = document.getElementById('pNote').value.trim();
   const rating = seciliRatingler.rating;
   const recovery = seciliRatingler.recovery;
+  const soreness = seciliRatingler.soreness;
   const kumiteDistance = seciliRatingler.kumiteDistance;
   const kumiteTiming = seciliRatingler.kumiteTiming;
   const kumiteTactic = seciliRatingler.kumiteTactic;
   const kumiteDefense = seciliRatingler.kumiteDefense;
   const kumiteScoring = seciliRatingler.kumiteScoring;
   const sessionType = seciliSessionType;
+  const injuryFlag = seciliInjuryFlag;
 
-  const doluMu = [pace, duration, sprint, reaction, weight, reps, rating, recovery,
-    kumiteDistance, kumiteTiming, kumiteTactic, kumiteDefense, kumiteScoring].some(x=>x!=null) || !!note;
+  const doluMu = [pace, duration, sprint, reaction, weight, reps, rating, recovery, sleep, rpe, soreness,
+    kumiteDistance, kumiteTiming, kumiteTactic, kumiteDefense, kumiteScoring].some(x=>x!=null) || !!note || injuryFlag==='var';
   if(!doluMu){
     toast('En az bir alan doldurmalısın');
     return;
   }
 
-  const kayit = {pace, duration, sprint, reaction, weight, reps, rating, note, sessionType,
-    recovery, kumiteDistance, kumiteTiming, kumiteTactic, kumiteDefense, kumiteScoring};
+  const kayit = {pace, duration, sprint, reaction, weight, reps, rating, note, sessionType, injuryFlag,
+    recovery, sleep, rpe, soreness, kumiteDistance, kumiteTiming, kumiteTactic, kumiteDefense, kumiteScoring};
   if(!performance_[tarih]) performance_[tarih] = {};
   performance_[tarih][athleteId] = kayit;
   await persistPerformance();
@@ -2275,13 +2355,19 @@ function renderPerfHistory(){
     if(k.kumiteTactic!=null) metrikler.push('taktik ' + k.kumiteTactic + '/5');
     if(k.kumiteDefense!=null) metrikler.push('savunma ' + k.kumiteDefense + '/5');
     if(k.kumiteScoring!=null) metrikler.push('skor ' + k.kumiteScoring + '/5');
+    if(k.rpe!=null) metrikler.push('RPE ' + k.rpe + '/10');
+    if(k.sleep!=null) metrikler.push('uyku ' + k.sleep + 'sa');
+    if(k.soreness!=null) metrikler.push('kas ağrısı ' + k.soreness + '/5');
     if(k.recovery!=null) metrikler.push('toparlanma ' + k.recovery + '/5');
     if(k.rating!=null) metrikler.push('genel ' + k.rating + '/5');
     return `
     <div class="perf-row">
       <div class="perf-top">
         <span style="font-family:var(--font-mono); font-size:12.5px; color:var(--ink-soft);">${k.tarih}</span>
-        <span class="perf-badge ${tip}">${SESSION_TYPE_LABEL[tip]}</span>
+        <span>
+          <span class="perf-badge ${tip}">${SESSION_TYPE_LABEL[tip]}</span>
+          ${k.injuryFlag==='var' ? `<span class="perf-badge injury">Ağrı/sakatlık</span>` : ''}
+        </span>
       </div>
       ${metrikler.length ? `<div class="perf-metrics">${metrikler.join(' · ')}</div>` : ''}
       ${k.note ? `<div class="perf-note">"${escapeHtml(k.note)}"</div>` : ''}
@@ -2301,6 +2387,7 @@ async function init(){
   const pDateEl = document.getElementById('pDate');
   if(pDateEl) pDateEl.value = todayStr();
   if(document.getElementById('pSessionType')) setSessionType('antrenman');
+  if(document.getElementById('pInjuryFlag')) setInjuryFlag('yok');
   fillGroupSelect();
   renderGroupList();
   fillPerfAthleteSelect();
